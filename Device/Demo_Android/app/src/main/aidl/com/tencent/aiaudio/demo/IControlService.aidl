@@ -40,11 +40,11 @@ interface IControlService {
 
     List<MediaMetaInfo> getCurrentMediaList(int sessionId);
 
-    String[] getCurrentPlayIdList(int sessionId);
+    List<MediaMetaInfo> getCurrentHistoryMediaList(int sessionId);
 
     MediaMetaInfo getCurrentMediaInfo(int sessionId);
 
-    void getMoreList(int sessionId);
+    void getMoreList(int sessionId, boolean isUp);
 
     void refreshPlayList(int sessionId);
 }

@@ -16,66 +16,28 @@
  */
 package com.tencent.xiaowei.sdk;
 
-import android.app.Service;
 import android.content.Context;
-import android.content.Intent;
-import android.os.IBinder;
-import android.support.annotation.Nullable;
 import android.text.TextUtils;
 
 import com.tencent.xiaowei.info.XWLoginInfo;
 import com.tencent.xiaowei.util.QLog;
 
-
-public class XWCoreService extends Service {
+// 请使用XWSDK.login替代
+@Deprecated
+public class XWCoreService {
 
     static String TAG = "XWCoreService";
 
-    public static XWLoginInfo mXWLoginInfo;
-
-    @Override
-    public void onCreate() {
-        super.onCreate();
-        QLog.i(TAG, "onCreate");
-    }
-
-    @Override
-    public int onStartCommand(Intent intent, int flags, int startId) {
-        super.onStartCommand(intent, flags, startId);
-        QLog.i(TAG, "onStartCommand");
-
-        return START_NOT_STICKY;
-    }
-
-    @Override
-    public void onDestroy() {
-        QLog.d(TAG, "onDestroy");
-        super.onDestroy();
-    }
-
-    @Nullable
-    @Override
-    public IBinder onBind(Intent intent) {
-        return null;
-    }
-
-    /**
-     * 初始化SDK
-     *
-     * @param context
-     * @param loginInfo 登录信息
-     * @return 错误码
-     */
+    @Deprecated
     public static int init(Context context, XWLoginInfo loginInfo) {
-        return initEx(context, loginInfo, 0, 5);
+        return initEx(context, loginInfo, 5);
     }
 
     /**
      * * 初始化SDK
      *
-     * @param context       上下文对象
-     * @param loginInfo     登录信息
-     * @param testMode      是否连接测试环境, 0为不连接测试环境，1为连接测试环境
+     * @param context        上下文对象
+     * @param loginInfo      登录信息
      * @param nativeLogLevel 控制打印native 的日志级别 取值[0-5],0表示关闭日志，1-5对应[e,w,i,d,v]。数字越大打印的日志级别越多。
      * @return 错误码
      * 0 成功，
@@ -99,8 +61,13 @@ public class XWCoreService extends Service {
      * err_sys_path_access_permission          = 0x0000001D,       //(29)      system_path没有读写权限
      * err_invalid_network_type				= 0x0000001E,		//(30)		初始化时传入的网络类型非法
      * err_invalid_run_mode					= 0x0000001F,		//(31)      初始化时传入的SDK运行模式非法
+     * 未找到设备信息，请确认设备是否开机或联网 34
+     * guid和licence不匹配 46
+     * licence长度超过255错误 57
+     * 公钥长度有问题 71
      */
-    public static int initEx(Context context, XWLoginInfo loginInfo, int testMode, int nativeLogLevel) {
+    @Deprecated
+    public static int initEx(Context context, XWLoginInfo loginInfo, int nativeLogLevel) {
         if (context == null) {
             throw new RuntimeException("Init XWSDK failed,context is null.");
         }
@@ -109,17 +76,15 @@ public class XWCoreService extends Service {
             return 3;
         }
 
-        mXWLoginInfo = loginInfo;
+        XWSDK.getInstance().mXWLoginInfo = loginInfo;
         QLog.init(context, context.getPackageName());
         XWSDKJNI.getInstance().initJNI(nativeLogLevel);
 
 
         int ret = XWSDKJNI.getInstance().init(loginInfo.deviceName, loginInfo.license.getBytes(), loginInfo.serialNumber, loginInfo.srvPubKey, loginInfo.productId, loginInfo.productVersion, loginInfo.networkType, loginInfo.runMode,
-                loginInfo.sysPath, loginInfo.sysCapacity, loginInfo.appPath, loginInfo.appCapacity, loginInfo.tmpPath, loginInfo.tmpCapacity, testMode);
+                loginInfo.sysPath, loginInfo.sysCapacity, loginInfo.appPath, loginInfo.appCapacity, loginInfo.tmpPath, loginInfo.tmpCapacity, 0);
 
         if (ret == 0) {
-            Intent intent = new Intent(context, XWCoreService.class);
-            context.startService(intent);
             int[] versions = XWSDKJNI.getInstance().getSDKVersion();
             QLog.setBuildNumber(versions[0] + "." + versions[1] + "." + versions[2]);
         }
@@ -138,12 +103,8 @@ public class XWCoreService extends Service {
         return true;
     }
 
+    @Deprecated
     public static void unInit(Context context) {
-        if (context == null) {
-            return;
-        }
-        Intent intent = new Intent(context, XWCoreService.class);
-        context.stopService(intent);
     }
 
 }

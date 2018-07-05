@@ -16,10 +16,9 @@
  */
 package com.tencent.xiaowei.sdk;
 
-import android.text.TextUtils;
+import android.content.Context;
 import android.util.Log;
 
-import com.tencent.xiaowei.info.XWAIAudioFriendInfo;
 import com.tencent.xiaowei.info.XWBinderInfo;
 import com.tencent.xiaowei.info.XWBinderRemark;
 import com.tencent.xiaowei.info.XWContactInfo;
@@ -30,25 +29,32 @@ import java.net.URI;
 import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Created by xw on 2016/11/25.
  * SDK基础功能
  */
 public class XWDeviceBaseManager {
     public static final String TAG = "XWDeviceBaseManager";
     // 绑定者相关
     private static OnGetBinderListListener mOnGetBinderListListener;
-    private static OnBinderEventListener mOnBinderEventListener;
     private static OnUnBindListener mOnEraseAllBinderListener;
     private static Runnable binderOnlineStatusRunnable = null;
     private static OnGetSDKLogListener mOnGetSDKLogListener;
 
     protected final static HashMap<Long, XWContactInfo> mAllFriendListCache = new HashMap<>();// 所有的XWContactInfo
+    private static XWSDK.OnXWLoginListener onXWLoginListener;
+    private static XWSDK.OnXWOnlineStatusListener onXWOnlineStatusListener;
 
     public static long getSelfDin() {
         return XWSDKJNI.getSelfDin();
+    }
+
+    static void setOnXWLoginListener(XWSDK.OnXWLoginListener listener) {
+        XWDeviceBaseManager.onXWLoginListener = listener;
+    }
+
+    static void setOnXWOnlineStatusListener(XWSDK.OnXWOnlineStatusListener listener) {
+        XWDeviceBaseManager.onXWOnlineStatusListener = listener;
     }
 
     /**
@@ -65,6 +71,9 @@ public class XWDeviceBaseManager {
      */
     static void onConnectedServer(int ret) {
         QLog.d(TAG, "onConnectedServer " + ret);
+        if (onXWLoginListener != null) {
+            onXWLoginListener.onConnectedServer(ret);
+        }
         if (mOnDeviceRegisterEventListener != null) {
             mOnDeviceRegisterEventListener.onConnectedServer(ret);
         }
@@ -76,26 +85,14 @@ public class XWDeviceBaseManager {
      * @param ret    0 注册成功，1 信息不对， 2 未知错误
      * @param subRet 对应的内部错误码
      */
-    static void onRegister(int ret, int subRet) {
-        QLog.d(TAG, "onRegister " + ret + " " + subRet);
+    static void onRegister(int ret, int subRet, long din) {
+        QLog.d(TAG, "onRegister " + ret + " " + subRet + " " + din);
+        if (onXWLoginListener != null) {
+            onXWLoginListener.onRegister(ret, subRet, din);
+        }
         if (mOnDeviceRegisterEventListener != null) {
             mOnDeviceRegisterEventListener.onRegister(ret, subRet);
         }
-    }
-
-
-    // 初始化注册相关
-    private static OnDeviceRegisterEventListener mOnDeviceRegisterEventListener;
-
-    public interface OnDeviceRegisterEventListener {
-
-        void onConnectedServer(int errorCode);
-
-        void onRegister(int errorCode, int subCode);// 10*n秒重试一次。n从1开始累加
-    }
-
-    public static void setOnDeviceRegisterEventListener(OnDeviceRegisterEventListener listener) {
-        mOnDeviceRegisterEventListener = listener;
     }
 
 
@@ -105,13 +102,13 @@ public class XWDeviceBaseManager {
      * @param listener
      */
     public static void getBinderList(OnGetBinderListListener listener) {
+        QLog.d(TAG, "getBinderList");
         XWBinderInfo[] list = XWSDKJNI.fetchBinderList();
         if (list != null && listener != null) {
             listener.onResult(0, XWSDKJNI.getBinderList());
         } else {
             mOnGetBinderListListener = listener;
         }
-        QLog.d(TAG, "getBinderList");
     }
 
     /**
@@ -155,6 +152,9 @@ public class XWDeviceBaseManager {
                     mOnGetBinderListListener = null;
                 } else {
                     // 被动改变的
+                    if (onXWLoginListener != null) {
+                        onXWLoginListener.onBinderListChange(error, mBinderList);
+                    }
                     if (mOnBinderEventListener != null) {
                         mOnBinderEventListener.onBinderListChange(error, mBinderList);
                     }
@@ -192,23 +192,6 @@ public class XWDeviceBaseManager {
             }
         });
         QLog.d(TAG, "onEraseAllBinders " + error);
-    }
-
-    /**
-     * 绑定者相关的事件监听器
-     */
-    public interface OnBinderEventListener {
-
-        void onBinderListChange(int error, ArrayList<XWBinderInfo> mBinderList);
-    }
-
-    /**
-     * 设置绑定者相关的事件监听器
-     *
-     * @param listener
-     */
-    public static void setOnBinderEventListener(OnBinderEventListener listener) {
-        mOnBinderEventListener = listener;
     }
 
     // 基础接口
@@ -332,46 +315,15 @@ public class XWDeviceBaseManager {
     }
 
     /**
-     * 获取腾讯云服务器标准校时时间(s)
+     * 获取腾讯云服务器标准校时时间(ms)
      */
-    public static int getServerTime() {
-        return XWSDKJNI.getServerTime();
-    }
-
-    // 登录相关
-    private static OnDeviceLoginEventListener mOnDeviceLoginEventListener;
-
-    /**
-     * 登录相关的监听器
-     */
-    public interface OnDeviceLoginEventListener {
-        /**
-         * 登录完成
-         *
-         * @param error 0表示成功
-         */
-        void onLoginComplete(int error);
-
-        /**
-         * 上线
-         */
-        void onOnlineSuccess();
-
-        /**
-         * 离线
-         */
-        void onOfflineSuccess();
-
-        /**
-         * 上传注册信息成功，在此时可以获得带正确token的绑定二维码
-         */
-        void onUploadRegInfo(int error);
-
-
+    public static long getServerTime() {
+        long time = XWSDKJNI.getServerTime();
+        return time;
     }
 
     /**
-     * 获取绑定者列表的结果
+     * 获取SDK的native日志，受login时候传入的参数日志级别的影响
      */
     public interface OnGetSDKLogListener {
         /**
@@ -396,11 +348,12 @@ public class XWDeviceBaseManager {
         }
     }
 
-    public static void setOnDeviceSDKEventListener(OnDeviceLoginEventListener listener) {
-        mOnDeviceLoginEventListener = listener;
-    }
 
     static void onLoginComplete(final int error) {
+        if (onXWLoginListener != null) {
+            onXWLoginListener.onLogin(error, getQRCodeUrl());
+        }
+
         if (mOnDeviceLoginEventListener != null) {
             postMain(new Runnable() {
                 @Override
@@ -412,6 +365,9 @@ public class XWDeviceBaseManager {
     }
 
     static void onOnlineSuccess() {
+        if (onXWOnlineStatusListener != null) {
+            onXWOnlineStatusListener.onOnline();
+        }
         if (mOnDeviceLoginEventListener != null) {
             postMain(new Runnable() {
                 @Override
@@ -423,6 +379,9 @@ public class XWDeviceBaseManager {
     }
 
     static void onOfflineSuccess() {
+        if (onXWOnlineStatusListener != null) {
+            onXWOnlineStatusListener.onOffline();
+        }
         if (mOnDeviceLoginEventListener != null) {
             postMain(new Runnable() {
                 @Override
@@ -457,16 +416,13 @@ public class XWDeviceBaseManager {
     private static IGetBinderRemarkListCallback mBinderRemarkListener = null;
 
     public static void registerBinderRemarkChangeListener(final IGetBinderRemarkListCallback callback) {
-        if (callback != null)
-            mBinderRemarkListener = callback;
+        mBinderRemarkListener = callback;
     }
 
     public static void getBinderRemarkList(final IGetBinderRemarkListCallback callback) {
         postMain(new Runnable() {
             @Override
             public void run() {
-//                int sid = XWSDKJNI.getBinderRemarkList();
-//                long[] adminInfo = XWSDKJNI.getBinderAdminInfo();
                 mGetBinderRemarkListCallbacks.put(XWSDKJNI.getBinderRemarkList(), callback);
             }
         });
@@ -518,7 +474,7 @@ public class XWDeviceBaseManager {
     }
 
     public static XWLoginInfo getLoginInfo() {
-        return XWCoreService.mXWLoginInfo;
+        return XWSDK.getInstance().mXWLoginInfo;
     }
 
     /**
@@ -540,7 +496,6 @@ public class XWDeviceBaseManager {
      */
     public static XWContactInfo getXWContactInfo(String uin) {
         XWContactInfo contact = mAllFriendListCache.get(Long.valueOf(uin));
-        //TXDeviceSDK.getMsgProxyFlag() == 1 &&
         if (contact == null) {
             contact = mAllFriendListCache.get(0);
         }
@@ -551,42 +506,82 @@ public class XWDeviceBaseManager {
         return contact;
     }
 
-    private static ConcurrentHashMap<String, GetFriendListRspListener> mGetFriendListListeners = new ConcurrentHashMap<>();
+    private static OnBinderEventListener mOnBinderEventListener;
+    // 初始化注册相关
+    private static OnDeviceRegisterEventListener mOnDeviceRegisterEventListener;
+    // 登录相关
+    private static OnDeviceLoginEventListener mOnDeviceLoginEventListener;
 
-    private static OnFriendListChangeListener mOnFriendListChangeListener;
 
-    public interface GetFriendListRspListener {
-        void onResult(int errCode, XWAIAudioFriendInfo[] friendList);
+    @Deprecated
+    public interface OnDeviceRegisterEventListener {
+
+        void onConnectedServer(int errorCode);
+
+        void onRegister(int errorCode, int subCode);// 10*n秒重试一次。n从1开始累加
     }
 
-    public interface OnFriendListChangeListener {
-        void onResult(XWAIAudioFriendInfo[] friendList);
+    @Deprecated
+    public static void setOnDeviceRegisterEventListener(OnDeviceRegisterEventListener listener) {
+        mOnDeviceRegisterEventListener = listener;
     }
 
 
     /**
-     * alarm_sound
-     * 设置代收联系人信息通知回调
+     * 绑定者相关的事件监听器，使用{@link XWSDK.OnXWLoginListener}替代。
+     */
+    @Deprecated
+    public interface OnBinderEventListener {
+
+        void onBinderListChange(int error, ArrayList<XWBinderInfo> mBinderList);
+    }
+
+    /**
+     * 设置绑定者相关的事件监听器，使用{@link XWSDK#login(Context, XWLoginInfo, XWSDK.OnXWLoginListener)}替代。
      *
      * @param listener
      */
-    public static void setOnFriendListChangeListener(OnFriendListChangeListener listener) {
-        mOnFriendListChangeListener = listener;
+    @Deprecated
+    public static void setOnBinderEventListener(OnBinderEventListener listener) {
+        mOnBinderEventListener = listener;
     }
 
+    /**
+     * 登录相关的监听器，使用{@link XWSDK#login(Context, XWLoginInfo, XWSDK.OnXWLoginListener)}替代。
+     */
+    @Deprecated
+    public interface OnDeviceLoginEventListener {
+        /**
+         * 登录完成
+         *
+         * @param error 0表示成功
+         */
+        void onLoginComplete(int error);
 
-    public static int getAIAudioFriendList(GetFriendListRspListener listener) {
-        String sessionID = XWSDKJNI.getAIAudioFriendList();
-        QLog.d(TAG, "getAIAudioFriendList sessionID: " + sessionID);
+        /**
+         * 上线
+         */
+        void onOnlineSuccess();
 
-        if (!TextUtils.isEmpty(sessionID)) {
-            mGetFriendListListeners.put(sessionID, listener);
-        } else {
-            listener.onResult(-1, null);
-            QLog.d(TAG, "getAIAudioFriendList failed session is null");
-        }
+        /**
+         * 离线
+         */
+        void onOfflineSuccess();
 
-        return (sessionID == null ? -1 : 0);
+        /**
+         * 上传注册信息成功，在此时可以获得带正确token的绑定二维码
+         */
+        void onUploadRegInfo(int error);
+
+
+    }
+
+    /**
+     * 登录相关的监听器，使用{@link XWSDK#login(Context, XWLoginInfo, XWSDK.OnXWLoginListener)}替代。
+     */
+    @Deprecated
+    public static void setOnDeviceSDKEventListener(OnDeviceLoginEventListener listener) {
+        mOnDeviceLoginEventListener = listener;
     }
 
 }

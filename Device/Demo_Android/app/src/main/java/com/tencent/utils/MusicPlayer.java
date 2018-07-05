@@ -27,7 +27,6 @@ import com.tencent.aiaudio.player.OpusPlayer;
 import com.tencent.xiaowei.control.XWMediaType;
 import com.tencent.xiaowei.control.info.XWeiMediaInfo;
 import com.tencent.xiaowei.def.XWCommonDef;
-import com.tencent.xiaowei.info.XWContextInfo;
 import com.tencent.xiaowei.info.XWEventLogInfo;
 import com.tencent.xiaowei.info.XWResourceInfo;
 import com.tencent.xiaowei.info.XWResponseInfo;
@@ -55,7 +54,7 @@ public class MusicPlayer {
 
     private HashMap<String, OnPlayListener> listenerHashMap = new HashMap<>(2);
 
-    private MusicPlayer() {
+    public MusicPlayer() {
         mHandlerThread = new HandlerThread("xiaowei_player");
         mHandlerThread.start();
         mHandler = new Handler(mHandlerThread.getLooper());
@@ -88,7 +87,6 @@ public class MusicPlayer {
         }
         return sSingleton2.getInstance();
     }
-
 
     private void initMusicPlayer() {
         if (mMusicPlayer != null) {
@@ -272,11 +270,12 @@ public class MusicPlayer {
                 listenerHashMap.put(mediaInfo.resId, listener);
                 switch (mediaInfo.mediaType) {
                     case XWMediaType.TYPE_MUSIC_URL:
+                    case XWMediaType.TYPE_LOCAL_FILE:
                         playUrl(mediaInfo.content, mediaInfo.offset, isLooping);
                         mCurrentPlayer.setTag(mediaInfo.resId);
                         break;
                     case XWMediaType.TYPE_TTS_TEXT:
-                        XWSDK.getInstance().requestTTS(mediaInfo.content.getBytes(), new XWContextInfo(), new XWSDK.RequestListener() {
+                        XWSDK.getInstance().requestTTS(mediaInfo.content.getBytes(), new XWSDK.RequestListener() {
                             @Override
                             public boolean onRequest(int event, XWResponseInfo rspData, byte[] extendData) {
                                 QLog.d(TAG, "playMediaInfo requestTTS");
@@ -317,6 +316,8 @@ public class MusicPlayer {
             info.mediaType = XWMediaType.TYPE_TTS_TEXT;
         } else if (resourceInfo.format == XWCommonDef.ResourceFormat.TTS) {
             info.mediaType = XWMediaType.TYPE_TTS_OPUS;
+        } else if (resourceInfo.format == XWCommonDef.ResourceFormat.FILE) {
+            info.mediaType = XWMediaType.TYPE_LOCAL_FILE;
         }
         info.offset = resourceInfo.offset;
         return info;

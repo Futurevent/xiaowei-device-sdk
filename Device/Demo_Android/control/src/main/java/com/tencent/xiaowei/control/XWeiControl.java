@@ -17,10 +17,9 @@
 package com.tencent.xiaowei.control;
 
 import com.tencent.xiaowei.control.info.XWeiMediaInfo;
-import com.tencent.xiaowei.control.info.XWeiMsgInfo;
 import com.tencent.xiaowei.control.info.XWeiPlayState;
+import com.tencent.xiaowei.def.XWCommonDef;
 import com.tencent.xiaowei.info.XWResponseInfo;
-import com.tencent.xiaowei.sdk.XWSDK;
 import com.tencent.xiaowei.util.QLog;
 
 import java.util.Arrays;
@@ -133,6 +132,14 @@ public class XWeiControl {
     native void nativeSetAudioFocus(int focus);
 
     /**
+     * 使用Android的焦点管理，获得焦点后通知内部
+     *
+     * @param cookie   参照onRequestAudioFocus的参数
+     * @param duration 小微使用的场景和Android系统焦点不太一致，请参照{@link XWeiAudioFocusManager}的常量定义，具体含义需要参照它的说明。
+     */
+    native void nativeSetAudioFocusChange(int cookie, int duration);
+
+    /**
      * 处理ASR/NLP或其他通用请求的数据处理
      *
      * @param voiceId    请求VoiceId
@@ -140,7 +147,7 @@ public class XWeiControl {
      * @param extendData 扩展数据
      */
     public boolean processResponse(String voiceId, XWResponseInfo rspData, byte[] extendData) {
-        return nativeProcessResponse(voiceId, XWSDK.EVENT_RESPONSE, rspData, extendData);
+        return nativeProcessResponse(voiceId, XWCommonDef.XWEvent.ON_RESPONSE, rspData, extendData);
     }
 
     /**
@@ -157,13 +164,6 @@ public class XWeiControl {
     }
 
     native boolean nativeProcessResponse(String voiceId, int event, XWResponseInfo rspData, byte[] extendData);
-
-    /**
-     * 添加消息到控制层的消息盒子，用于下载完成的文件类消息添加到消息盒子
-     *
-     * @param info 消息的内容
-     */
-    native void nativeAddMsgToMsgbox(XWeiMsgInfo info);
 
     /**
      * 设置播放器管理器
@@ -206,13 +206,27 @@ public class XWeiControl {
     }
 
     /**
-     * 焦点改变回调 (JNI回调)
+     * 使用内部的焦点管理，焦点改变回调 (JNI回调)
      *
      * @param cookie
      * @param focusCount 焦点类型
      */
     private void onFocusChange(int cookie, int focusCount) {
         XWeiAudioFocusManager.getInstance().onFocusChange(cookie, focusCount);
+    }
+
+    /**
+     * 播放控制需要申请系统焦点了
+     */
+    private int onRequestAudioFocus(int cookie, int duration) {
+        return XWeiAudioFocusManager.getInstance().onRequestAudioFocus(cookie, duration);
+    }
+
+    /**
+     * 播放控制暂时不需要播放了，可以释放系统焦点
+     */
+    private int onAbandonAudioFocus(int cookie) {
+        return XWeiAudioFocusManager.getInstance().onAbandonAudioFocus(cookie);
     }
 
     /**
@@ -295,13 +309,14 @@ public class XWeiControl {
     /**
      * 播放列表新增资源项
      *
-     * @param sessionId      场景sessionId
-     * @param isFront        是否从队头入队
-     * @param mediaInfoArray 媒体资源
+     * @param sessionId        场景sessionId
+     * @param resourceListType 播放列表类型，参照XWResponseInfo的对应字段
+     * @param isFront          是否从队头入队
+     * @param mediaInfoArray   媒体资源
      * @return 是否已处理
      */
-    private boolean onPlaylistAddItem(int sessionId, boolean isFront, XWeiMediaInfo[] mediaInfoArray) {
-        return getXWeiPlayerMgr() != null && getXWeiPlayerMgr().OnPlaylistAddItem(sessionId, isFront, mediaInfoArray);
+    private boolean onPlaylistAddItem(int sessionId, int resourceListType, boolean isFront, XWeiMediaInfo[] mediaInfoArray) {
+        return getXWeiPlayerMgr() != null && getXWeiPlayerMgr().OnPlaylistAddItem(sessionId, resourceListType, isFront, mediaInfoArray);
     }
 
     /**
@@ -366,50 +381,10 @@ public class XWeiControl {
         }
     }
 
-    /**
-     * 控制层通知下载消息文件
-     *
-     * @param tinyId   发送者id
-     * @param channel  使用的文件通道
-     * @param type     消息文件的类型
-     * @param key1     文件的下载key
-     * @param key2     文件的校验key
-     * @param duration 消息的时长
-     */
-    public void onDownloadMsgFile(int sessionId, long tinyId, int channel, int type, String key1,
-                                  String key2, int duration, int timestamp) {
-        QLog.e(TAG, "onDownloadMsgFile: " + sessionId + " " + tinyId);
+    public void onGetMoreList(int sessionId, int type, String playId) {
+        QLog.d(TAG, "onGetMoreList: " + sessionId + " " + type + " " + playId);
         if (getXWeiPlayerMgr() != null) {
-            getXWeiPlayerMgr().onDownloadMsgFile(sessionId, tinyId, channel, type, key1, key2, duration, timestamp);
-        }
-    }
-
-    public void addMsgToMsgbox(XWeiMsgInfo msgInfo) {
-        nativeAddMsgToMsgbox(msgInfo);
-    }
-
-    /**
-     * 通知消息开始录音
-     *
-     * @param sessionId
-     */
-    public void onAudioMsgRecord(int sessionId) {
-        QLog.d(TAG, "onAudioMsgRecord: " + sessionId);
-        if (getXWeiPlayerMgr() != null) {
-            getXWeiPlayerMgr().onAudioMsgRecord(sessionId);
-        }
-    }
-
-    /**
-     * 通知消息发送
-     *
-     * @param sessionId
-     * @param tinyId
-     */
-    public void onAudioMsgSend(int sessionId, long tinyId) {
-        QLog.d(TAG, "onAudioMsgSend: " + sessionId);
-        if (getXWeiPlayerMgr() != null) {
-            getXWeiPlayerMgr().onAudioMsgSend(sessionId, tinyId);
+            getXWeiPlayerMgr().onGetMoreList(sessionId, type, playId);
         }
     }
 }

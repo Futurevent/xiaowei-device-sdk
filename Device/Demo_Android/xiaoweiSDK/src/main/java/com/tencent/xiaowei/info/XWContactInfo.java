@@ -22,7 +22,7 @@ import android.os.Parcelable;
 import com.tencent.xiaowei.util.JsonUtil;
 
 /**
- * Created by xw on 2016/11/22.
+ * 联系人基类
  */
 public class XWContactInfo implements Parcelable {
 
@@ -62,6 +62,10 @@ public class XWContactInfo implements Parcelable {
      * 在线状态：0是离线，非0为在线
      */
     public int online;
+    /**
+     * 小微App设置的备注
+     */
+    public String xwRemark;
 
     public XWContactInfo() {
 
@@ -77,6 +81,7 @@ public class XWContactInfo implements Parcelable {
         type = in.readInt();
         remark = in.readString();
         contactType = in.readInt();
+        xwRemark = in.readString();
     }
 
     public static final Creator<XWContactInfo> CREATOR = new Creator<XWContactInfo>() {
@@ -103,6 +108,7 @@ public class XWContactInfo implements Parcelable {
         dest.writeInt(type);
         dest.writeString(remark);
         dest.writeInt(contactType);
+        dest.writeString(xwRemark);
     }
 
     @Override
@@ -119,6 +125,7 @@ public class XWContactInfo implements Parcelable {
         info.remark = remark;
         info.contactType = contactType;
         info.online = online;
+        info.xwRemark = xwRemark;
         return info;
     }
 }

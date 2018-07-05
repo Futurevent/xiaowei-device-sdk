@@ -43,7 +43,8 @@ class CMedia
 
     void DecPlayCnt();
     int GetPlayCnt();
-
+    
+    bool Belong(int list_type);
     //  见 txc_media_read() 声明
     virtual int Read(_Out_ const void **data, _Out_ size_t *data_size, _In_ size_t offset) = 0;
 
@@ -56,6 +57,7 @@ class CMedia
     std::string description_; // play resource description
     unsigned long long offset_;     // play resource offset
     int play_count_;          // play count default is -1 no limit
+    int belong_list_type_;
 
     txc_media_t info_; //pointer to res_id_, content_, description_
 };

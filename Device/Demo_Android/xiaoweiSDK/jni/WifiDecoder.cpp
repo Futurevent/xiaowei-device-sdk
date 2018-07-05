@@ -41,7 +41,9 @@ JNIEXPORT int JNICALL Java_com_tencent_xiaowei_sdk_XWSDKJNI_startWifiDecoder
         (JNIEnv *env, jclass service, jstring serial_number, jint sample_rate, jint mode) {
     if (mode & WDM_VOICE_LINK) {
         /* code */
+#ifndef NO_VOICELINK
         tx_init_decoder(on_voice_link_notify, sample_rate);
+#endif
     }
 
     if (mode & WDM_SMART_LINK) {
@@ -60,8 +62,9 @@ JNIEXPORT void JNICALL Java_com_tencent_xiaowei_sdk_XWSDKJNI_fillVoiceWavData
             pBuffer = new char[nBufLen];
             memset(pBuffer, 0, nBufLen);
             env->GetByteArrayRegion(wav, 0, nBufLen, (jbyte *) pBuffer);
-
+#ifndef NO_VOICELINK
             tx_fill_audio((short *) pBuffer, nBufLen / 2);
+#endif
             delete[]pBuffer;
         } else {
             __android_log_print(ANDROID_LOG_INFO, LOGFILTER, "wav is NULL\n");
@@ -73,8 +76,9 @@ JNIEXPORT void JNICALL Java_com_tencent_xiaowei_sdk_XWSDKJNI_fillVoiceWavData
 
 JNIEXPORT int JNICALL Java_com_tencent_xiaowei_sdk_XWSDKJNI_stopWifiDecoder
         (JNIEnv *env, jclass) {
-
+#ifndef NO_VOICELINK
     tx_uninit_decoder();
+#endif
     return 0;
 }
 

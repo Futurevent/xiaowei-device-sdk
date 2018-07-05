@@ -31,6 +31,7 @@ typedef struct _txca_param_login_status
     const char *open_id;        // 登录的openId
     const char *access_token;   // 登录的accessToken
     const char *refresh_token;  // 登录的refreshToken
+    const char *skill_id;       // 登录的skillId
 } TXCA_PARAM_LOGIN_STATUS;
 
 /**

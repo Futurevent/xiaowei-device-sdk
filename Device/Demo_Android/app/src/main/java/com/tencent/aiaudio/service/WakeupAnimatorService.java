@@ -146,6 +146,9 @@ public class WakeupAnimatorService extends Service {
 
                     if (text.length() > 0)
                         mTvText.setVisibility(View.VISIBLE);
+                    else{
+                        mTvText.setVisibility(View.GONE);
+                    }
                     break;
             }
         }

@@ -122,7 +122,7 @@
     <string name="help">帮助</string>
     <string name="help_music_1">\"小薇,我想听热搜榜\"</string>
     <string name="help_music_2">\"小薇,我想听陈奕迅的《好久不见》\"</string>
-    <string name="help_music_3">\"小薇,播放我的歌单\"</string>
+    <string name="help_music_3">\"小薇,播放我的收藏\"</string>
     <string name="help_music_4">\"小薇,收藏这首歌\"</string>
 
     <string name="loss_less_quality">无损品质</string>

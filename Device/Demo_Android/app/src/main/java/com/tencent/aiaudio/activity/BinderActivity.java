@@ -18,47 +18,197 @@ package com.tencent.aiaudio.activity;
 
 import android.os.Bundle;
 import android.support.annotation.Nullable;
+import android.text.TextUtils;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.AdapterView;
+import android.widget.Button;
+import android.widget.GridView;
+import android.widget.ImageView;
+import android.widget.TextView;
 
-import com.tencent.xiaowei.info.XWBinderRemark;
-import com.tencent.xiaowei.sdk.XWDeviceBaseManager;
+import com.squareup.picasso.Picasso;
+import com.tencent.aiaudio.CommonApplication;
+import com.tencent.aiaudio.activity.base.BaseActivity;
+import com.tencent.aiaudio.adapter.CommonListAdapter;
+import com.tencent.aiaudio.chat.AVChatManager;
+import com.tencent.aiaudio.demo.R;
 import com.tencent.xiaowei.info.XWBinderInfo;
-import com.tencent.xiaowei.util.QLog;
+import com.tencent.xiaowei.info.XWBinderRemark;
+import com.tencent.xiaowei.info.XWContactInfo;
+import com.tencent.xiaowei.sdk.XWDeviceBaseManager;
 
 import java.util.ArrayList;
 
-public class BinderActivity extends ContactActivity {
+public class BinderActivity extends BaseActivity {
     static final String TAG = "BinderActivity";
+
+    private GridView mGridView;
+    protected CommonListAdapter<XWContactInfo> mAdapter;
+    private boolean mIs264Mode;
+    private boolean mIsAudioMode;
+    private Button mBtnSwitch;
+    private final String AUDIO_MODE_TEXT = "语音电话";
+    private final String VIDEO_MODE_TEXT = "视频电话";
+    private final String H264_MODE_TEXT = "264测试";
+
+    XWDeviceBaseManager.IGetBinderRemarkListCallback listener = new XWDeviceBaseManager.IGetBinderRemarkListCallback() {
+        @Override
+        public void onResult(XWBinderRemark[] binderRemarks) {
+            ArrayList<XWBinderInfo> arrayList = XWDeviceBaseManager.getBinderList();
+            for (XWBinderRemark remark : binderRemarks) {
+                for (XWBinderInfo binderInfo : arrayList) {
+                    if (binderInfo.tinyID == remark.tinyid) {
+                        binderInfo.remark = remark.remark;
+                    }
+                }
+            }
+
+            if (arrayList.isEmpty()) {
+                return;
+            }
+
+            mAdapter.clear();
+            XWBinderInfo[] binderArray = new XWBinderInfo[arrayList.size()];
+            binderArray = arrayList.toArray(binderArray);
+            mAdapter.addAll(binderArray);
+            mAdapter.notifyDataSetChanged();
+        }
+    };
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        XWDeviceBaseManager.registerBinderRemarkChangeListener(new XWDeviceBaseManager.IGetBinderRemarkListCallback(){
+        setContentView(R.layout.activity_contact);
+        initViews();
+        initAdapter();
+        initDatas();
+        initEvens();
+
+        XWDeviceBaseManager.registerBinderRemarkChangeListener(listener);
+    }
+
+    private void initDatas() {
+        mIs264Mode = sp.getBoolean("is_264_mode", false);//先判断是否是264的测试
+        mIsAudioMode = sp.getBoolean("is_audio", false);
+        updateData();
+    }
+
+    private void initEvens() {
+        mGridView.setAdapter(mAdapter);
+        mGridView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override
-            public void onResult(XWBinderRemark[] binderRemarks) {
-                ArrayList<XWBinderInfo> arrayList = XWDeviceBaseManager.getBinderList();
-                for (XWBinderRemark remark: binderRemarks) {
-                    for (XWBinderInfo binderInfo: arrayList) {
-                        if (binderInfo.tinyID == remark.tinyid) {
-                            binderInfo.remark = remark.remark;
-                        }
-                    }
+            public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+                if (!AVChatManager.getInstance().isCalling()) {
+                    AVChatManager.getInstance().setThirdManageCamera(ifThirdManageCamera());//是否由用户管理摄像头
+                    AVChatManager.getInstance().startAudioVideoChat(mAdapter.getItem(position).tinyID);// 启动AVSDK需要时间大概1-3s，根据性能确定
+                    CommonApplication.showToast("正在启动QQ电话");
+                } else {
+                    CommonApplication.showToast("已经在通话中了");
                 }
 
-                if (arrayList.isEmpty()) {
-                    return;
-                }
-
-                mAdapter.clear();
-                XWBinderInfo[] binderArray = new XWBinderInfo[arrayList.size()];
-                binderArray = arrayList.toArray(binderArray);
-                mAdapter.addAll(binderArray);
-                mAdapter.notifyDataSetChanged();
             }
         });
+
+        updateData();
+
+        mBtnSwitch.setText(getBtnModeText());
+        mBtnSwitch.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                changeBtnMode();
+                setChatParam();
+            }
+        });
+
+        setChatParam();
+    }
+
+    private void setChatParam() {
+        AVChatManager.getInstance().setAudioMode(mIsAudioMode);
+    }
+
+    private void initAdapter() {
+        mAdapter = new CommonListAdapter<XWContactInfo>() {
+            @Override
+            protected View initListCell(int position, View convertView, ViewGroup parent) {
+                convertView = getLayoutInflater().inflate(R.layout.item_contact, parent, false);
+                ((TextView) convertView.findViewById(R.id.tv)).setText(mAdapter.getItem(position).remark);
+                if (!TextUtils.isEmpty(mAdapter.getItem(position).headUrl)) {
+                    Picasso.with(convertView.getContext()).load(mAdapter.getItem(position).headUrl).into((ImageView) convertView.findViewById(R.id.iv));
+                }
+                return convertView;
+            }
+        };
+    }
+
+    private void initViews() {
+        mGridView = (GridView) findViewById(R.id.gv);
+        mBtnSwitch = (Button) findViewById(R.id.btn_switch);
     }
 
     @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        XWDeviceBaseManager.registerBinderRemarkChangeListener(null);
+    }
+
+    private String getBtnModeText() {
+        String btnText = "";
+        if (mIs264Mode) {
+            btnText = H264_MODE_TEXT;
+        } else {
+            if (mIsAudioMode) {
+                btnText = AUDIO_MODE_TEXT;
+            } else {
+                btnText = VIDEO_MODE_TEXT;
+            }
+        }
+        return btnText;
+    }
+
+
+    private void changeBtnMode() {
+        if (mBtnSwitch != null) {
+            String curText = mBtnSwitch.getText().toString();
+            if (!TextUtils.isEmpty(curText)) {
+                String nextText = "";
+                if (H264_MODE_TEXT.equals(curText)) {//当前是264切换成 音频
+                    nextText = AUDIO_MODE_TEXT;
+                    mIs264Mode = false;
+                    mIsAudioMode = true;
+                } else if (AUDIO_MODE_TEXT.equals(curText)) {//当前是音频切换成 视频
+                    nextText = VIDEO_MODE_TEXT;
+                    mIs264Mode = false;
+                    mIsAudioMode = false;
+                } else if (VIDEO_MODE_TEXT.equals(curText)) {//当前是视频切换成 264
+                    nextText = H264_MODE_TEXT;
+                    mIs264Mode = true;
+                    mIsAudioMode = false;
+                }
+                editor.putBoolean("is_264_mode", mIs264Mode);
+                editor.commit();
+                editor.putBoolean("is_audio", mIsAudioMode);
+                editor.commit();
+                mBtnSwitch.setText(nextText);
+            }
+        }
+    }
+
+    private boolean ifThirdManageCamera() {
+        boolean ifThirdManage = false;
+        if (mBtnSwitch != null) {
+            String curText = mBtnSwitch.getText().toString();
+            if (!TextUtils.isEmpty(curText)) {
+                if (H264_MODE_TEXT.equals(curText)) {
+                    ifThirdManage = true;
+                }
+            }
+        }
+        return ifThirdManage;
+    }
+
     protected void updateData() {
         // 这里XWSDKJNI.getInstance().getDeviceBinderList可以同步取到设备的绑定者，其中可以拿到QQ体系的备注（昵称）
         // getBinderRemarkList是去异步的取绑定者的小微体系的"呼叫备注名"
@@ -66,8 +216,8 @@ public class BinderActivity extends ContactActivity {
             @Override
             public void onResult(XWBinderRemark[] binderRemarks) {
                 ArrayList<XWBinderInfo> arrayList = XWDeviceBaseManager.getBinderList();
-                for (XWBinderRemark remark: binderRemarks) {
-                    for (XWBinderInfo binderInfo: arrayList) {
+                for (XWBinderRemark remark : binderRemarks) {
+                    for (XWBinderInfo binderInfo : arrayList) {
                         if (binderInfo.tinyID == remark.tinyid) {
                             binderInfo.remark = remark.remark;
                         }

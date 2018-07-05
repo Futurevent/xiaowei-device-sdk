@@ -60,8 +60,7 @@
         {                                                                                                                               \
             if (__obj)                                                                                                                  \
                 __result = __obj->F(__##ARG1_NAME, __##ARG2_NAME, __##ARG3_NAME, __##ARG4_NAME);                                        \
-            __sync__semaphore.Post();                                                                                                   \
-            __sync__semaphore.Post();                                                                                                   \
+            __sync__semaphore.Post();                                                                                                                                                                                                   \
         };                                                                                                                              \
         ARG1_TYPE __##ARG1_NAME;                                                                                                        \
         ARG2_TYPE __##ARG2_NAME;                                                                                                        \
@@ -82,10 +81,11 @@
         return _asyn_task->__result;                                                                                                       \
     }
 
-#define TXC_ASYN_PUSH_TASK(CCLASS, F, ARG1_NAME, ARG2_NAME, ARG3_NAME, ARG4_NAME)                                                          \
+#define TXC_ASYN_PUSH_TASK(CCLASS, F, ARG1_NAME, ARG2_NAME, ARG3_NAME, ARG4_NAME, ARG5_NAME)                                                          \
     {                                                                                                                                      \
         tag_as_##CCLASS##F##_AsynTask_ *_asyn_task = new tag_as_##CCLASS##F##_AsynTask_(this, ARG1_NAME, ARG2_NAME, ARG3_NAME, ARG4_NAME); \
         TXCAutoPtr<TXCTask> spTask(_asyn_task);                                                                                            \
+        spTask->when = ARG5_NAME;\
         PushTask(spTask);                                                                                                                  \
         return true;                                                                                                                       \
     }
@@ -96,6 +96,7 @@
 struct TXCTask
 {
     //public:
+    unsigned long long when = 0;// 什么时候执行的绝对时间，单位ms，如果是0表示立刻。
     virtual ~TXCTask(){};
 
     virtual void Run() = 0;

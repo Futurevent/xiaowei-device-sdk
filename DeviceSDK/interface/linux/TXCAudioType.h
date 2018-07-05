@@ -23,7 +23,7 @@ CXX_EXTERN_BEGIN
 
 /**
  *
- * 语音云通道层接口
+ * 小微通道层接口
  *
  */
 
@@ -51,7 +51,6 @@ typedef enum _txca_event {
     txca_event_on_recognize     = 4,    // 识别文本实时返回
     txca_event_on_response      = 5,    // 请求收到响应
     txca_event_on_tts           = 6,    // 小微后台推送的TTS信息
-    txca_event_on_voice_data    = 7,    // 语音请求的音频数据，用于外部保存数据到文件
 } TXCA_EVENT;
 
 // 硬件设备支持属性定义
@@ -82,8 +81,15 @@ typedef enum _txca_playlist_action {
     txca_playlist_enqueue_back    = 2,    // 拼接到列表队尾
     txca_playlist_replace_enqueue = 3,    // 不中断当前播放的资源，替换列表的详情
     txca_playlist_update_enqueue  = 4,    // 不中断播放，更新列表中某些播放资源的url和quality字段信息
-    txca_playlist_remove          = 5,    // 从播放列表中移除这些资源
+    txca_playlist_update_enqueue_all  = 5,    // 不中断播放，更新列表中播放资源的url和description
+    txca_playlist_remove          = 6,    // 从播放列表中移除这些资源
 } TXCA_PLAYLIST_ACTION;
+
+// 资源播放类型操作定义
+typedef enum _txca_playlist_type {
+    txca_playlist_type_default     = 0,    // 默认的列表，当前列表。
+    txca_playlist_type_history   = 1,    // 这个场景的历史列表
+} TXCA_PLAYLIST_TYPE;
 
 // 语音请求类型
 typedef enum _txca_chat_type {
@@ -104,6 +110,7 @@ typedef enum _txca_playstate {
     txca_playstate_idle     = 5,    // 空闲状态
     txca_playstate_resume   = 6,    // 继续
     txca_playstate_abort   = 11,   // 播放中断
+    txca_playstate_err   = 12,   // 播放出错
 } TXCA_PLAYSTATE;
 
 // 使用自有 App 绑定小微设备的账号类型
@@ -135,6 +142,7 @@ typedef enum _txca_wakeup_type {
     txca_wakeup_type_local           = 0,    // 本地唤醒
     txca_wakeup_type_cloud           = 1,    // 云端校验唤醒
     txca_wakeup_type_local_with_text = 2,    // 本地唤醒带唤醒词文本
+    txca_wakeup_type_local_with_free = 3,    // 本地免唤醒
 } TXCA_WAKEUP_TYPE;
 
 // 唤醒场景定义
@@ -142,6 +150,12 @@ typedef enum _txca_wakeup_profile {
     txca_wakeup_profile_far  = 0,    // 远场
     txca_wakeup_profile_near = 1,    // 近场，例如遥控器
 } TXCA_WAKEUP_PROFILE;
+
+// 接口txca_request_protocol_tts中参数cmd的类型定义
+typedef enum _txca_protocol_cmd_type {
+    txca_protocol_cmd_msg    = 403,    // QQ消息
+    txca_protocol_cmd_chat   = 404,    // QQ电话
+} TXCA_PROTOCOL_CMD_TYPE;
 
 //  使用自有 App 绑定小微设备的账号相关信息
 typedef struct _txca_param_account
@@ -227,10 +241,12 @@ typedef struct _txca_param_response
     unsigned int resource_groups_size;       // 资源集合列表size
     TXCA_PARAM_RES_GROUP *resource_groups;     // 资源集合列表
     bool has_more_playlist;                // 是否可以加载更多
+    bool has_history_playlist;                // 是否可以加载历史记录
     bool is_recovery;                      // 是否可以恢复播放
     bool is_notify;                        // 是通知
     unsigned int wakeup_flag;               // 请参考TXCA_WAKEUP_FLAG 云端校验唤醒请求带下来的结果，0表示非该类结果，1表示唤醒失败，2表示唤醒成功并且未连续说话，3表示说的指令唤醒词，4可能为中间结果，表示唤醒成功了，还在继续检测连续说话或者已经在连续说话了
     TXCA_PLAYLIST_ACTION play_behavior;       // 列表拼接类型
+    TXCA_PLAYLIST_TYPE resource_list_type;  // 资源列表类型，可能为当前列表、历史列表等类型
     
     char *auto_test_data;            // 用于自动化测试的相关信息，可以忽略
 } TXCA_PARAM_RESPONSE;

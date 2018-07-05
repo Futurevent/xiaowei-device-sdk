@@ -17,6 +17,7 @@
 #include "txctypedef.h"
 #include "TXCSemaphore.hpp"
 
+#include <sys/time.h>
 #include <stdio.h>
 #include <string.h>
 #include <cassert>
@@ -25,17 +26,7 @@
 TXCSemaphore::TXCSemaphore()
 {
 #ifdef OS_MAC
-    static volatile unsigned int sem_id = 0;
-    psem_ = SEM_FAILED;
-
-    while (SEM_FAILED == psem_)
-    {
-        unsigned int cur_id = ++sem_id;
-        memset(sem_name_, 0, sizeof(sem_name_));
-        sprintf(sem_name_, "_tmp_txcsem_%u", cur_id);
-        psem_ = sem_open(sem_name_, O_CREAT | O_EXCL, S_IRUSR | S_IWUSR, 0);
-    }
-    assert(psem_ != SEM_FAILED);
+    semaphore = dispatch_semaphore_create(0);
 #else
     psem_ = &sem_;
     int err = sem_init(psem_, 0, 0);
@@ -45,12 +36,7 @@ TXCSemaphore::TXCSemaphore()
 TXCSemaphore::~TXCSemaphore()
 {
 #ifdef OS_MAC
-    if (SEM_FAILED != psem_)
-    {
-        sem_close(psem_);
-        sem_unlink(sem_name_);
-        psem_ = NULL;
-    }
+    dispatch_release(semaphore);
 #else
     sem_destroy(psem_);
 #endif
@@ -58,29 +44,70 @@ TXCSemaphore::~TXCSemaphore()
 int TXCSemaphore::Wait()
 {
     int err = -1;
+    
+#ifdef OS_MAC
+    err = (int) dispatch_semaphore_wait(semaphore, DISPATCH_TIME_FOREVER);
+#else
     if (SEM_FAILED != psem_)
     {
         err = sem_wait(psem_);
     }
-    //    assert(0 == err);
+#endif
     return err;
 }
+
+int TXCSemaphore::Wait(unsigned long long time_ms)
+{
+    int err = -1;
+
+#ifdef OS_MAC
+    dispatch_time_t  time = dispatch_time(DISPATCH_TIME_NOW, time_ms*1000*1000);
+    err = (int) dispatch_semaphore_wait(semaphore, time);
+#else
+    if (SEM_FAILED != psem_)
+    {
+        struct timespec abs_time;
+        struct timeval time;
+        gettimeofday(&time, NULL);
+        time.tv_usec += time_ms * 1000; // 单位是us
+        if(time.tv_usec >= 1000000) // 进位
+        {
+            time.tv_sec += time.tv_usec / 1000000;
+            time.tv_usec %= 1000000;
+        }
+        abs_time.tv_sec = time.tv_sec;
+        abs_time.tv_nsec = time.tv_usec * 1000;
+        err = sem_timedwait(psem_, &abs_time);
+    }
+#endif
+    return err;
+
+}
+
 int TXCSemaphore::Try()
 {
     int err = -1;
+#ifdef OS_MAC
+    err = (int) dispatch_semaphore_wait(semaphore, DISPATCH_TIME_NOW);
+#else
     if (SEM_FAILED != psem_)
     {
         err = sem_trywait(psem_);
     }
+#endif
     return err;
 }
+
 int TXCSemaphore::Post()
 {
     int err = -1;
+#ifdef OS_MAC
+    err = (int) dispatch_semaphore_signal(semaphore);
+#else
     if (SEM_FAILED != psem_)
     {
         err = sem_post(psem_);
     }
-    assert(0 == err);
+#endif
     return err;
 }

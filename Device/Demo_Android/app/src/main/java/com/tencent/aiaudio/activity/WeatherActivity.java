@@ -184,21 +184,21 @@ public class WeatherActivity extends BaseActivity {
     }
 
     static class Weather {
-        String loc;
-        ArrayList<WeatherItem> data;
+        String loc;// 位置
+        ArrayList<WeatherItem> data;// 昨天+今天+未来14天的天气
     }
 
     static class WeatherItem {
-        String condition;
-        String date;
-        String max_tp;
-        String min_tp;
-        String pm25;
-        String quality;
-        String tp;
-        String wind_direct;
-        String wind_lv;
-        String is_asked;
+        String condition;// 天气描述，例如"多云"
+        String date;// 日期，格式为"2018-05-05"
+        String is_asked;// 是否为用户询问的这天，"1"表示是，否则为空
+        String max_tp;// 最高温度
+        String min_tp;// 最低温度
+        String pm25;// PM指标，只有当天有
+        String quality;// 空气质量
+        String tp;// 当前温度
+        String wind_direct;// 风向
+        String wind_lv;// 风级别
     }
 
     @Override

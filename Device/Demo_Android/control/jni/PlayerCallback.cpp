@@ -53,7 +53,7 @@ bool CPlayerCallback::OnXWMPlaylistAddItem(SESSION id, long begin_index, long co
     const txc_player_info_t *player_info = txc_get_player_info(id);
     if (player_info) {
 
-        const txc_playlist_t *playlist_info = txc_get_medialist_info(player_info->playlist_id);
+        const txc_playlist_t *playlist_info = txc_get_medialist_info(player_info->session);
         if (playlist_info
             && playlist_info->count > 0) {
         }
@@ -72,8 +72,8 @@ CPlayerCallback::txc_control_android_callback(SESSION id, TXC_PLAYER_ACTION acti
         case ACT_PLAYER_FINISH:
             handled = OnActFinish(id);
             break;
-        //case ACT_PLAYER_STOP:
-          //  handled = OnActStop(id);
+        case ACT_PLAYER_STOP:
+            handled = OnActStop(id);
             break;
         case ACT_PLAYER_PAUSE:
             OnActPause(id, bool(arg1));
@@ -89,13 +89,21 @@ CPlayerCallback::txc_control_android_callback(SESSION id, TXC_PLAYER_ACTION acti
                                  reinterpret_cast<long>(arg2));
             break;
         case ACT_PLAYLIST_ADD_ITEM:
-            handled = OnPlaylistAddItem(id, reinterpret_cast<const txc_media_t **>(arg1),
-                                        false, reinterpret_cast<long>(arg2));
+            handled = OnPlaylistAddItem(id, txca_playlist_type_default, false, reinterpret_cast<const txc_media_t **>(arg1),
+                                         reinterpret_cast<long>(arg2));
             break;
         case ACT_PLAYLIST_ADD_ITEM_FRONT:
-            handled = OnPlaylistAddItem(id, reinterpret_cast<const txc_media_t **>(arg1),
-                                        true, reinterpret_cast<long>(arg2));
+            handled = OnPlaylistAddItem(id, txca_playlist_type_default, true, reinterpret_cast<const txc_media_t **>(arg1),
+                                         reinterpret_cast<long>(arg2));
             break;
+        case ACT_PLAYLIST_HISTORY_ADD_ITEM:
+            handled = OnPlaylistAddItem(id, txca_playlist_type_history, false, reinterpret_cast<const txc_media_t **>(arg1),
+                                         reinterpret_cast<long>(arg2));
+            break;
+        case ACT_PLAYLIST_HISTORY_ADD_ITEM_FRONT:
+            handled = OnPlaylistAddItem(id, txca_playlist_type_history, true, reinterpret_cast<const txc_media_t **>(arg1),
+                                         reinterpret_cast<long>(arg2));
+        break;
         case ACT_PLAYLIST_REMOVE_ITEM:
             handled = OnPlaylistRemoveItem(id, reinterpret_cast<const txc_media_t **>(arg1),
                                            reinterpret_cast<long>(arg2));
@@ -122,19 +130,9 @@ CPlayerCallback::txc_control_android_callback(SESSION id, TXC_PLAYER_ACTION acti
             ReportPlayState(id, state);
             break;
         }
-        case ACT_DOWNLOAD_MSG: {
-            OnDownloadMsg(id, reinterpret_cast<txc_download_msg_data_t*>(arg1));
+        case ACT_NEED_GET_MORE_LIST:
+            OnGetMoreList(id, (XWM_GET_MORE_LIST_TYPE)(reinterpret_cast<long>(arg1)), reinterpret_cast<const char *>(arg2));
             break;
-        }
-        case ACT_AUDIOMSG_RECORD: {
-            OnAudioMsgRecord(id);
-            break;
-        }
-        case ACT_AUDIOMSG_SEND: {
-            OnAudioMsgSend(id, *((unsigned long long*)arg1));
-            break;
-        }
-
         default:
             break;
     }
@@ -283,14 +281,14 @@ bool CPlayerCallback::OnAddAlbum(SESSION id, const txc_media_t *album, long inde
 }
 
 bool
-CPlayerCallback::OnPlaylistAddItem(SESSION id, const txc_media_t **list, bool isFront, long count) {
+CPlayerCallback::OnPlaylistAddItem(SESSION id, TXCA_PLAYLIST_TYPE resource_list_type, bool is_front, const txc_media_t **list, long count) {
     bool handled = false;
 
     bool needRelease = false;
     JNIEnv *env = CGlobalJNIEnv::GetJNIEnv(&needRelease);
     if (env && list != NULL && count > 0) {
         jmethodID methodID = env->GetMethodID(s_class_XWeiControl, "onPlaylistAddItem",
-                                              "(IZ[Lcom/tencent/xiaowei/control/info/XWeiMediaInfo;)Z");
+                                              "(IIZ[Lcom/tencent/xiaowei/control/info/XWeiMediaInfo;)Z");
         if (methodID) {
             if (s_class_MediaInfo) {
                 jmethodID init = env->GetMethodID(s_class_MediaInfo, "<init>", "()V");
@@ -334,7 +332,7 @@ CPlayerCallback::OnPlaylistAddItem(SESSION id, const txc_media_t **list, bool is
 
                     }
                 }
-                handled = env->CallBooleanMethod(s_obj_XWeiControl, methodID, id, isFront,
+                handled = env->CallBooleanMethod(s_obj_XWeiControl, methodID, id, resource_list_type, is_front,
                                                  objMediaInfoArray);
 
                 env->DeleteLocalRef(objMediaInfoArray);
@@ -621,66 +619,28 @@ long long CPlayerCallback::ReportPlayState(SESSION id, TXCA_PARAM_STATE *state) 
     return 0;
 }
 
-void CPlayerCallback::OnDownloadMsg(SESSION id, const txc_download_msg_data_t* data)
-{
-    bool needRelease = false;
-    JNIEnv *env = CGlobalJNIEnv::GetJNIEnv(&needRelease);
-    if (env && data != NULL) {
-        jmethodID methodID = env->GetMethodID(s_class_XWeiControl, "onDownloadMsgFile",
-                                              "(IJIILjava/lang/String;Ljava/lang/String;II)V");
-
-        __android_log_print(ANDROID_LOG_ERROR, "CPlayerCallback", "OnDownloadMsg id:%d tinyId:%llu channel:%d type:%d key1:%s mini_token:%s duration:%d timestamp:%d",
-            id, data->tinyId, data->channel, data->type, data->key, data->mini_token, data->duration, data->timestamp);
-        if (methodID) {
-            jstring jstr_key1 = env->NewStringUTF(data->key);
-            jstring jstr_key2 = NULL;
-            if (data->mini_token)
-                jstr_key2 = env->NewStringUTF(data->mini_token);
-
-            env->CallVoidMethod(s_obj_XWeiControl, methodID, id, (jlong)data->tinyId, data->channel,
-                data->type, jstr_key1, jstr_key2, data->duration, data->timestamp);
-
-            env->DeleteLocalRef(jstr_key1);
-            if (jstr_key2 != NULL)
-                env->DeleteLocalRef(jstr_key2);
-        }
-    }
-    if (needRelease) {
-        CGlobalJNIEnv::Util_ReleaseEnv();
-    }
-}
-
-void CPlayerCallback::OnAudioMsgRecord(SESSION id)
+void CPlayerCallback::OnGetMoreList(SESSION id, XWM_GET_MORE_LIST_TYPE type, const char* play_id)
 {
     bool needRelease = false;
     JNIEnv *env = CGlobalJNIEnv::GetJNIEnv(&needRelease);
     if (env) {
-        jmethodID methodID = env->GetMethodID(s_class_XWeiControl, "onAudioMsgRecord", "(I)V");
-        if (methodID) {
-            env->CallVoidMethod(s_obj_XWeiControl, methodID, id);
-        }
-    }
-    if (needRelease) {
-        CGlobalJNIEnv::Util_ReleaseEnv();
-    }
-}
-
-void CPlayerCallback::OnAudioMsgSend(SESSION id, unsigned long long tinyId)
-{
-    bool needRelease = false;
-    JNIEnv *env = CGlobalJNIEnv::GetJNIEnv(&needRelease);
-    if (env) {
-        __android_log_print(ANDROID_LOG_ERROR, "CPlayerCallback", "OnAudioMsgSend tinyId:%llu", tinyId);
-        jmethodID methodID = env->GetMethodID(s_class_XWeiControl, "onAudioMsgSend", "(IJ)V");
+        jmethodID methodID = env->GetMethodID(s_class_XWeiControl, "onGetMoreList", "(IILjava/lang/String;)V");
         if (methodID){
-            env->CallVoidMethod(s_obj_XWeiControl, methodID, id, (jlong)tinyId);
+            jstring strPlayId = NULL;
+            if(play_id) {
+                strPlayId = env->NewStringUTF(play_id);
+            }
+
+            env->CallVoidMethod(s_obj_XWeiControl, methodID, id, (int)type, strPlayId);
+            if(strPlayId) {
+                env->DeleteLocalRef(strPlayId);
+            }
         }
     }
     if (needRelease) {
         CGlobalJNIEnv::Util_ReleaseEnv();
     }
 }
-
 
 void CPlayerCallback::InitClasses(JNIEnv *env, jclass service) {
     s_obj_XWeiControl = env->NewGlobalRef(service);

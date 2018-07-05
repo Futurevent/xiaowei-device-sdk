@@ -38,6 +38,12 @@ public class XWAppInfo implements Parcelable {
     public String ID;
 
     /**
+     * 和ID一致，便于解析json
+     */
+    @Deprecated
+    public String id;
+
+    /**
      * App 类型，App(Skill)类型，用于进行场景分类，决定了部分扩展字段的解析方法
      */
     public int type;

@@ -19,104 +19,47 @@
 
 //////////////////// AudioApp.hpp ////////////////////
 
-#include "Player.hpp"
 #include "AudioApp.h"
-#include <pthread.h>
+#include "Player.hpp"
 #include "AppSkill.hpp"
 
 class AppSkill;
 
-class ThreadChecker
-{
-  public:
-    ThreadChecker();
-    void Check();
-
-  private:
-    pthread_t thread_id_;
-};
-#define THREAD_CHECKER ThreadChecker debug_thread_checker_;
-#define Thread_Check debug_thread_checker_.Check();
-
 //
 class CAudioApp
 {
-  public:
-    ~CAudioApp();
+public:
+  ~CAudioApp();
 
-    const txc_session_info &GetInfo();
-    static AppSkill *notify_app_;
-  protected:
-    CAudioApp(int process_id);
+  const txc_session_info &GetInfo();
+  static AppSkill *notify_app_;
 
-    friend class TXCAppManager;
-    //  change app from wakeup sence to an exactly sence
-    void SetAppType(const TXCA_PARAM_RESPONSE &cRsp);
-    const std::string GetAppType();
-    const SESSION GetSessionId();
+protected:
+  CAudioApp(int process_id);
 
-    //  return true if responce handled, otherwise return false;
-    bool OnAiAudioRsp(const TXCA_PARAM_RESPONSE &cRsp);
+  friend class TXCAppManager;
+  //  change app from wakeup sence to an exactly sence
+  void SetAppType(const TXCA_PARAM_RESPONSE &cRsp);
+  const std::string GetAppType();
+  const SESSION GetSessionId();
 
-    bool OnMessage(XWM_EVENT event, XWPARAM arg1, XWPARAM arg2);
+  //  return true if responce handled, otherwise return false;
+  bool OnAiAudioRsp(const TXCA_PARAM_RESPONSE &cRsp);
 
-  private:
-    bool IsFitAppScene(const TXCA_PARAM_RESPONSE &cRsp);
+  bool OnMessage(XWM_EVENT event, XWPARAM arg1, XWPARAM arg2);
 
-    //////////////// need request here?
-    //    @return session id
-    SESSION Request(const char *buf, int len);
-    SESSION RequestTTS(const char *);
-    SESSION RequestText(const char *);
-    //    report statistics dot
-    void Report(const char *content);
+private:
+  bool IsFitAppScene(const TXCA_PARAM_RESPONSE &cRsp);
 
-    bool CheckSkillInfo(const TXCA_PARAM_SKILL skill_info);
-  private:
-    int process_id_;
-    txc_session_info info_;
+  bool CheckSkillInfo(const TXCA_PARAM_SKILL skill_info);
 
-    std::string skill_id_;
-    std::string skill_name_;
-    AppSkill *strategy_;
+private:
+  int process_id_;
+  txc_session_info info_;
+
+  std::string skill_id_;
+  std::string skill_name_;
+  AppSkill *strategy_;
 };
-
-////////////////////////////////////////
-//////////////////// start of system architecture
-//class Grammar
-//{
-//public:
-//    int Recognize(unsigned char *wav, unsigned int len);
-//};
-//class Bot
-//{
-//public:
-//
-//};
-//class Kit
-//{
-//
-//};
-
-//////////////////// end of system architecture
-////////////////////////////////////////
-
-//////// bridge ////////
-
-class TXCAudioService
-{
-  public:
-    void Init();
-
-  private:
-    friend class TXCServices;
-    TXCAudioService();
-    TXCAudioService(const TXCAudioService &);
-    TXCAudioService &operator=(const TXCAudioService &);
-};
-
-bool post_message(SESSION id, XWM_EVENT event, XWPARAM arg1, XWPARAM arg2, unsigned int delay = 0);
-
-bool send_message(SESSION id, XWM_EVENT event, XWPARAM arg1, XWPARAM arg2);
 
 #endif /* _AIAUDIO_AUDIOAPP_HPP_ */

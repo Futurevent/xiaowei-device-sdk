@@ -20,7 +20,7 @@ import android.os.Parcel;
 import android.os.Parcelable;
 
 /**
- * Created by lingyuhuang on 2016/11/22.
+ * 对于只能同进程录音的设备，用这个结构来往视频通话进程传递声音数据
  */
 public class XWAudioFrameInfo implements Parcelable {
 

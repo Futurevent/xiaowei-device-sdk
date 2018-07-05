@@ -21,7 +21,6 @@ import android.content.Intent;
 import android.os.Bundle;
 import android.support.v4.content.LocalBroadcastManager;
 
-import com.tencent.aiaudio.msg.XWeiMsgTransfer;
 import com.tencent.xiaowei.control.Constants;
 import com.tencent.xiaowei.control.IXWeiPlayer;
 import com.tencent.xiaowei.control.IXWeiPlayerMgr;
@@ -87,13 +86,21 @@ public class XWeiPlayerMgr implements IXWeiPlayerMgr {
         if (mSkillUIEventListener != null) {
             mSkillUIEventListener.onFinish(sessionId);
         }
+        if (player != null)
+            player.release();
+        players.remove(sessionId);
 
         return handled;
     }
 
     @Override
     public boolean OnStopPlayer(int sessionId) {
-        return OnPausePlayer(sessionId, true);
+        IXWeiPlayer player = getPlayer(sessionId);
+        boolean handled = (player != null && player.stop(sessionId));
+        if (player != null)
+            player.release();
+        players.remove(sessionId);
+        return handled;
     }
 
     @Override
@@ -135,9 +142,9 @@ public class XWeiPlayerMgr implements IXWeiPlayerMgr {
     }
 
     @Override
-    public boolean OnPlaylistAddItem(int sessionId, boolean isFront, XWeiMediaInfo[] mediaInfoArray) {
+    public boolean OnPlaylistAddItem(int sessionId, int resourceListType, boolean isFront, XWeiMediaInfo[] mediaInfoArray) {
         if (mSkillUIEventListener != null) {
-            mSkillUIEventListener.onPlaylistAddItem(sessionId, isFront, mediaInfoArray);
+            mSkillUIEventListener.onPlaylistAddItem(sessionId, resourceListType, isFront, mediaInfoArray);
         }
         return true;
     }
@@ -179,7 +186,7 @@ public class XWeiPlayerMgr implements IXWeiPlayerMgr {
     }
 
     @Override
-    public boolean OnSupplement(int sessionId, String contextId, int speakTimeout, int silentTimeout,long requestParam) {
+    public boolean OnSupplement(int sessionId, String contextId, int speakTimeout, int silentTimeout, long requestParam) {
         if (mSkillUIEventListener != null) {
             mSkillUIEventListener.onAutoWakeup(sessionId, contextId, speakTimeout, silentTimeout, requestParam);
         }
@@ -203,19 +210,10 @@ public class XWeiPlayerMgr implements IXWeiPlayerMgr {
     }
 
     @Override
-    public void onAudioMsgRecord(int sessionId) {
-        XWeiMsgTransfer.getInstance().onAudioMsgRecord();
-    }
-
-    @Override
-    public void onAudioMsgSend(int sessionId, long tinyId) {
-        XWeiMsgTransfer.getInstance().onAudioMsgSend(tinyId);
-    }
-
-    public void onDownloadMsgFile(int sessionId, long tinyId, int channel, int type, String key1,
-                           String key2, int duration, int timestamp) {
-        //控制层通知消息文件到来的信息，由app控制是否下载
-        XWeiMsgTransfer.getInstance().onDownloadMsgFile(sessionId, tinyId, channel, type, key1, key2, duration, timestamp);
+    public void onGetMoreList(int sessionId, int type, String playId) {
+        if (mSkillUIEventListener != null) {
+            mSkillUIEventListener.onGetMoreList(sessionId, type, playId);
+        }
     }
 
     private void notifyControlEvent(String action, Bundle extra) {
@@ -246,7 +244,7 @@ public class XWeiPlayerMgr implements IXWeiPlayerMgr {
          * @param sessionId      场景sessionId
          * @param mediaInfoArray 新增播放资源
          */
-        void onPlaylistAddItem(int sessionId, boolean isFront, XWeiMediaInfo[] mediaInfoArray);
+        void onPlaylistAddItem(int sessionId, int resourceListType, boolean isFront, XWeiMediaInfo[] mediaInfoArray);
 
         /**
          * 播放列表资源信息更新
@@ -326,6 +324,13 @@ public class XWeiPlayerMgr implements IXWeiPlayerMgr {
          * @param silentTimeout
          */
         void onAutoWakeup(int sessionId, String contextId, int speakTimeout, int silentTimeout, long requestParam);
+
+        /**
+         * 获取历史列表
+         *
+         * @param sessionId
+         */
+        void onGetMoreList(int sessionId, int type, String playId);
     }
 
 }

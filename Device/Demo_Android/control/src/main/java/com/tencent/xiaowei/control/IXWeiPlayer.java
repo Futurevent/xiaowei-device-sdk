@@ -101,4 +101,9 @@ public interface IXWeiPlayer {
      * @param playState
      */
     void onNeedReportPlayState(int sessionId, XWeiPlayState playState);
+
+    /**
+     * 释放资源
+     */
+    void release();
 }

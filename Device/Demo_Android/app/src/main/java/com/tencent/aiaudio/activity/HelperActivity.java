@@ -31,7 +31,6 @@ import com.tencent.aiaudio.adapter.CommonListAdapter;
 import com.tencent.xiaowei.def.XWCommonDef;
 import com.tencent.aiaudio.demo.R;
 import com.tencent.xiaowei.sdk.XWSDK;
-import com.tencent.xiaowei.info.XWContextInfo;
 
 import java.util.ArrayList;
 
@@ -77,7 +76,7 @@ public class HelperActivity extends BaseActivity {
                 String text = mAdapter.getItem(position);
                 try {
                     text = text.substring(text.indexOf(",") + 1);
-                    XWSDK.getInstance().request(XWCommonDef.RequestType.TEXT, text.getBytes(), new XWContextInfo());
+                    XWSDK.getInstance().request(XWCommonDef.RequestType.TEXT, text.getBytes());
                 } catch (Exception e) {
 
                 }

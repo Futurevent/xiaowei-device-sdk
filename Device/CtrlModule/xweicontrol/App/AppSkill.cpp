@@ -15,6 +15,7 @@
  *
  */
 #include "AppSkill.hpp"
+#include "TXCSkillsDefine.h"
 #include "Medialist.hpp"
 #include "Playlist.hpp"
 #include "Player.hpp"
@@ -22,11 +23,9 @@
 #include "MediaMusic.hpp"
 #include "MediaText.hpp"
 #include "TXCServices.hpp"
-#include "PlayerControl.hpp"
 #include "logger.h"
 #include "OuterSkillMgr.h"
 #include "CommonMgr.h"
-#include "TXCSkillsDefineEx.h"
 #include "AudioFocusManager.hpp"
 #include "document.h"
 #include "writer.h"
@@ -44,17 +43,13 @@ AppSkill::AppSkill(int app_id)
 PlayerKit::PlayerKit(int app_id)
     : AppSkill(app_id), m_is_need_play(false), m_isRecovery(false)
 {
-    playlist_.reset(new CPlaylist(REPEAT_SEQUENCE, app_id));
-    control_.reset(new CPlayerControl(app_id, playlist_.get()));
-    player_ = TXCServices::instance()->GetPlayerManager()->NewPlayer(app_id_, playlist_->GetRepeat());
+    control_.reset(new CSkillControl(app_id, REPEAT_SEQUENCE));
 }
 
 PlayerKit::PlayerKit(int app_id, REPEAT_MODE repeat_mode)
     : AppSkill(app_id), m_is_need_play(false), m_isRecovery(false)
 {
-    playlist_.reset(new CPlaylist(repeat_mode, app_id));
-    control_.reset(new CPlayerControl(app_id, playlist_.get()));
-    player_ = TXCServices::instance()->GetPlayerManager()->NewPlayer(app_id_, playlist_->GetRepeat());
+    control_.reset(new CSkillControl(app_id, repeat_mode));
 }
 
 PlayerKit::~PlayerKit()
@@ -83,48 +78,52 @@ bool PlayerKit::PreProcessResourceCommand(const TXCA_PARAM_RES_GROUP *v_groups, 
                         switch (cmd_id)
                         {
                         case PROPERTY_ID_PLAY:
-                            if(!m_is_need_play) {
+                            if (!m_is_need_play)
+                            {
                                 return true;
                             }
                             TXCServices::instance()->GetAudioFocusManager()->RequestAudioFocus(app_id_, this, m_isRecovery ? AUDIOFOCUS_GAIN : AUDIOFOCUS_GAIN_TRANSIENT);
-                            player_->Play();
+                            control_->Play();
                             break;
                         case PROPERTY_ID_NEXT:
-                            if(!m_is_need_play) {
+                            if (!m_is_need_play)
+                            {
                                 return true;
                             }
                             TXCServices::instance()->GetAudioFocusManager()->RequestAudioFocus(app_id_, this, m_isRecovery ? AUDIOFOCUS_GAIN : AUDIOFOCUS_GAIN_TRANSIENT);
-                            player_->Next(1);
+                            send_message(app_id_, XWM_NEXT, XWPARAM(1), 0);
                             break;
                         case PROPERTY_ID_PREV:
-                            if(!m_is_need_play) {
+                            if (!m_is_need_play)
+                            {
                                 return true;
                             }
                             TXCServices::instance()->GetAudioFocusManager()->RequestAudioFocus(app_id_, this, m_isRecovery ? AUDIOFOCUS_GAIN : AUDIOFOCUS_GAIN_TRANSIENT);
-                            player_->Next(-1);
+                            send_message(app_id_, XWM_NEXT, XWPARAM(-1), 0);
                             break;
                         case PROPERTY_ID_PAUSE:
                         case PROPERTY_ID_STOP:
                         case PROPERTY_ID_EXIT:
-                                if(!m_is_need_play) {
-                                    return true;
-                                }
-                                player_->Pause();
+                            if (!m_is_need_play)
+                            {
+                                return true;
+                            }
+                            send_message(app_id_, XWM_PAUSE, XWPARAM(1), XWPARAM(0));
                             break;
                         case PROPERTY_ID_REPEAT:
-                            player_->Next(0);
+                            send_message(app_id_, XWM_NEXT, XWPARAM(0), 0);
                             break;
                         case PROPERTY_ID_PLAYMODE_LOOP:
-                            player_->SetRepeat(REPEAT_LOOP);
+                            send_message(app_id_, XWM_REPEAT, XWPARAM(REPEAT_LOOP), 0);
                             break;
                         case PROPERTY_ID_PLAYMODE_ORDER:
-                            player_->SetRepeat(REPEAT_SEQUENCE);
+                            send_message(app_id_, XWM_REPEAT, XWPARAM(REPEAT_SEQUENCE), 0);
                             break;
                         case PROPERTY_ID_PLAYMODE_RANDOM:
-                            player_->SetRepeat(REPEAT_RANDOM);
+                            send_message(app_id_, XWM_REPEAT, XWPARAM(REPEAT_RANDOM), 0);
                             break;
                         case PROPERTY_ID_PLAYMODE_SINGLE:
-                            player_->SetRepeat(REPEAT_SINGLE);
+                            send_message(app_id_, XWM_REPEAT, XWPARAM(REPEAT_SINGLE), 0);
                             break;
                         case PROPERTY_ID_KEEP_SHARE: // TTS
                             if (CommonMgr.on_common_control)
@@ -162,40 +161,32 @@ void PlayerKit::OnAudioFocusChange(int focus_change)
     switch (focus_change)
     {
     case AUDIOFOCUS_GAIN:
-        player_->Play(true);
+        control_->Play(true);
         post_message(app_id_, XWM_VOLUME, (XWPARAM)100, 0);
         break;
     case AUDIOFOCUS_GAIN_TRANSIENT:
-        player_->Play(true);
+        control_->Play(true);
         post_message(app_id_, XWM_VOLUME, (XWPARAM)100, 0);
         break;
     case AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK:
-        player_->Play(true);
+        control_->Play(true);
         post_message(app_id_, XWM_VOLUME, (XWPARAM)100, 0);
         break;
     case AUDIOFOCUS_LOSS_TRANSIENT:
         // 可以暂停了
-        player_->Pause(true);
+        send_message(app_id_, XWM_PAUSE, XWPARAM(1), XWPARAM(true));
         break;
     case AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK:
-        player_->Play(true);
+        control_->Play(true);
         post_message(app_id_, XWM_VOLUME, (XWPARAM)20, 0);
         break;
     case AUDIOFOCUS_LOSS:
         // 可以释放播放资源了
         {
-            PtrMediaList &media_list = player_->GetMediaList();
-            if (media_list->Count() > 0)
-            {
-                send_message(app_id_, XWM_STOP, 0, 0);
-                send_message(app_id_, XWM_LIST_REMOVED, XWPARAM(0), XWPARAM(playlist_->Count()));
-                TLOG_DEBUG("sessionId=%d PlayerKit::AUDIOFOCUS_LOSS XWM_LIST_REMOVED", app_id_);
+            TLOG_DEBUG("sessionId=%d PlayerKit::AUDIOFOCUS_LOSS Release.", app_id_);
 
-                media_list->Clear();
-                playlist_->Clear();
-            }
+            control_->Release();
             m_is_need_play = false;
-
             control_->ReportPlayState(txca_playstate_finished);
         }
         break;
@@ -207,7 +198,8 @@ void PlayerKit::OnAudioFocusChange(int focus_change)
 /*
  1.通知类型的过滤
  2.预处理控制指令
- 3.根据play_behavior 来决定如何处理资源列表
+ 3.根据resource_list_type 来决定这些资源存储在哪个播放列表，分为默认列表和历史列表。
+ 4.根据play_behavior 来决定如何处理资源列表
     a.如果是txca_playlist_replace_all类型，直接替换列表并且中断播放，并且通知UI层需要打开界面，并且需要清楚旧的，添加新的播放列表到UI。
     b.如果是txca_playlist_enqueue_back类型，添加新的播放列表到UI的尾部。
     c.如果是txca_playlist_enqueue_front类型，添加新的播放列表到UI的顶部。
@@ -227,62 +219,89 @@ bool PlayerKit::OnAiAudioRsp(const TXCA_PARAM_RESPONSE &cRsp)
     }
 
     // 如果只有一个操作指令，就不要再继续了
-    if(cRsp.resource_groups_size == 1 && cRsp.resource_groups[0].resources_size == 1 && cRsp.resource_groups[0].resources[0].format == txca_resource_command)
+    if (cRsp.resource_groups_size == 1 && cRsp.resource_groups[0].resources_size == 1 && cRsp.resource_groups[0].resources[0].format == txca_resource_command)
     {
         TLOG_DEBUG("sessionId=%d %s::OnAiAudioRsp finished, because of rsp has only a command.", app_id_, GetClassName().c_str());
         return true;
     }
-    
-    if(!Util::IsVaild(cRsp)) {
+
+    if (!Util::IsVaild(cRsp))
+    {
         // 这里不处理没任何资源的请求
         TLOG_DEBUG("sessionId=%d %s::OnAiAudioRsp finished, because of rsp has not resource without command.", app_id_, GetClassName().c_str());
         return handled;
     }
-    
-    if(cRsp.is_notify && !CanProcessNotify(cRsp))
+
+    // 下面只处理播放资源和显示的资源
+
+    if (cRsp.is_notify && !CanProcessNotify(cRsp))
     {
         TLOG_DEBUG("sessionId=%d %s::OnAiAudioRsp finished, goto notify app.", app_id_, GetClassName().c_str());
         return CAudioApp::notify_app_->OnAiAudioRsp(cRsp);
     }
-    
+
     ProcessPlayList(cRsp, handled);
-    
+
     return handled;
 }
 
-void PlayerKit::ProcessPlayList(const TXCA_PARAM_RESPONSE &cRsp, bool& handled)
+void PlayerKit::ProcessPlayList(const TXCA_PARAM_RESPONSE &cRsp, bool &handled)
 {
     TLOG_DEBUG("sessionId=%d OnAiAudioRsp %s::ProcessPlayList resource_groups_size=%d play_behavior=%d.", app_id_, GetClassName().c_str(), cRsp.resource_groups_size, cRsp.play_behavior);
 
     // 先判断下发的资源是不是一个提示(例如：收藏成功、当前在播放xxx)
     bool isNotify = cRsp.is_notify;
-    
-    if (cRsp.play_behavior == txca_playlist_replace_all || cRsp.play_behavior == txca_playlist_enqueue_back || cRsp.play_behavior == txca_playlist_enqueue_front)
+
+    if (cRsp.play_behavior == txca_playlist_replace_all || cRsp.play_behavior == txca_playlist_enqueue_back || cRsp.play_behavior == txca_playlist_enqueue_front || cRsp.play_behavior == txca_playlist_replace_enqueue)
     {
-        
-        PtrMediaList &media_list = player_->GetMediaList();
-        size_t first_index = cRsp.play_behavior == txca_playlist_enqueue_front ? 0 : playlist_->Count();
-        
-        if (first_index > 0 && cRsp.play_behavior == txca_playlist_replace_all)
+
+        size_t first_index = cRsp.play_behavior == txca_playlist_enqueue_front ? 0 : control_->PlayListCount((int)cRsp.resource_list_type);
+        size_t added_count = 0; // 媒体资源新增个数
+        size_t org_playlist_count = 0;
+
+        if ((cRsp.play_behavior == txca_playlist_replace_all || cRsp.play_behavior == txca_playlist_replace_enqueue))
         {
-            send_message(app_id_, XWM_STOP, 0, 0);
-            send_message(app_id_, XWM_LIST_REMOVED, XWPARAM(0), XWPARAM(first_index));
-            TLOG_DEBUG("sessionId=%d OnAiAudioRsp %s::ProcessPlayList XWM_LIST_REMOVED", app_id_, GetClassName().c_str());
+            // 先清除之前的列表
+            if(first_index > 0) {
+                if(cRsp.play_behavior == txca_playlist_replace_all) {
+                    send_message(app_id_, XWM_STOP, 0, 0);
+                }
+                if (cRsp.resource_list_type == txca_playlist_type_default)
+                {
+                    control_->ClearList();
+                    control_->ClearMediaList(); // 全部清除，包括历史列表页清除
+                }
+                else
+                {
+                    control_->ClearList((int)cRsp.resource_list_type);
+                    control_->ClearMediaList((int)cRsp.resource_list_type);
+                }
+                first_index = 0;
+            }
             
-            media_list->Clear();
-            playlist_->Clear();
-            first_index = 0;
+            // 再保存列表查询的字段
+            PtrMediaList mediaList = control_->GetMediaList();
+            txc_playlist_t playListInfo = mediaList->GetInfo();
+            playListInfo.has_history = cRsp.has_history_playlist;
+            if(cRsp.resource_list_type == txca_playlist_type_default) {
+                playListInfo.has_more_current_up = cRsp.has_more_playlist;
+                playListInfo.has_more_current = cRsp.has_more_playlist;
+            } else if(cRsp.resource_list_type == txca_playlist_type_history) {
+                playListInfo.has_more_history_up = playListInfo.has_history && cRsp.has_more_playlist;
+                playListInfo.has_more_history = playListInfo.has_history && cRsp.has_more_playlist;
+            }
+            mediaList->SetInfo(&playListInfo);
         }
         
-        size_t added_count = 0; // 媒体资源新增个数
-        size_t org_playlist_count = playlist_->Count();
+        org_playlist_count = control_->PlayListCount((int)cRsp.resource_list_type);
+
         size_t new_playlist_count = 0;
         PtrMedia media_album;
         int index_album = -1;
-        
+
         if (cRsp.response_data)
         {
-            int index = player_->AddResponseData(cRsp.response_type, cRsp.response_data, media_album);
+            int index = control_->AddResponseData(cRsp.response_type, cRsp.response_data, media_album);
             if (index >= 0 && media_album.get())
             {
                 index_album = index;
@@ -292,78 +311,58 @@ void PlayerKit::ProcessPlayList(const TXCA_PARAM_RESPONSE &cRsp, bool& handled)
         }
 
         added_count += AddList(cRsp, media_album, index_album);
-        new_playlist_count = playlist_->Count();
-        TLOG_DEBUG("sessionId=%d OnAiAudioRsp %s::ProcessPlayList after AddList index_album=%d added_count=%d new_playlist_count=%d org_playlist_count=%d", app_id_, GetClassName().c_str(), index_album, added_count, new_playlist_count, org_playlist_count);
+        new_playlist_count = control_->PlayListCount((int)cRsp.resource_list_type);
 
-        //  如果是第一次在某个场景新增资源，那么需要添加封面媒体资源通知UI层
+        //  如果是第一次在某个场景新增资源，那么需要通知UI层展示UI，并初始化一些值
         if (!isNotify && index_album >= 0 && media_album.get())
         {
             send_message(app_id_, XWM_ALBUM_ADDED, XWPARAM((long)index_album), XWPARAM(0));
+            
+            m_isRecovery = cRsp.is_recovery;
         }
-        //  media list added
-        //if (0 < added_count ) {
-        //    send_message(app_id_, XWM_MEDIA_ADDED, XWPARAM(first_index), XWPARAM(added_count));
-        //}
+        TLOG_DEBUG("sessionId=%d OnAiAudioRsp %s::ProcessPlayList after AddList type=%d index_album=%d added_count=%d new_playlist_count=%d org_playlist_count=%d has_history=%d", app_id_, GetClassName().c_str(), cRsp.resource_list_type, index_album, added_count, new_playlist_count, org_playlist_count, cRsp.has_history_playlist);
+        
         //  UI层playlist新增播放资源
         if (new_playlist_count > org_playlist_count)
         {
-            send_message(app_id_, XWM_LIST_ADDED, XWPARAM(first_index), XWPARAM(new_playlist_count - org_playlist_count));
+            send_message(app_id_, cRsp.resource_list_type == txca_playlist_type_default ? XWM_LIST_ADDED : XWM_LIST_HISTORY_ADDED, XWPARAM(first_index), XWPARAM(new_playlist_count - org_playlist_count));
         }
         
-        //  play
-        TLOG_DEBUG("sessionId=%d OnAiAudioRsp %s::ProcessPlayList goto play. player_status=%d", app_id_, GetClassName().c_str(), player_->GetStatus());
-        if (cRsp.play_behavior == txca_playlist_replace_all)
-        {
-            m_isRecovery = cRsp.is_recovery;
-        }
-        
-        if (org_playlist_count <= 0 && new_playlist_count > org_playlist_count)
-        {
-            DURATION_HINT hint = AUDIOFOCUS_GAIN;
-            if (isNotify)
+        if(cRsp.play_behavior != txca_playlist_replace_enqueue) {
+            // 如果是当前在播放的列表被替换了，需要准备播放第一个
+            TLOG_DEBUG("sessionId=%d OnAiAudioRsp %s::ProcessPlayList[%d] goto play. player_status=%d", app_id_, GetClassName().c_str(), cRsp.resource_list_type, control_->GetStatus());
+            if (org_playlist_count <= 0 && new_playlist_count > org_playlist_count)
             {
-                hint = AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK;
+                control_->SetCurPlayListType(cRsp.resource_list_type);
+                DURATION_HINT hint = AUDIOFOCUS_GAIN;
+                if (isNotify)
+                {
+                    hint = AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK;
+                }
+                else if (!cRsp.is_recovery)
+                {
+                    hint = AUDIOFOCUS_GAIN_TRANSIENT;
+                }
+                TXCServices::instance()->GetAudioFocusManager()->RequestAudioFocus(app_id_, this, hint);
+                m_is_need_play = true;
             }
-            else if (!cRsp.is_recovery)
-            {
-                hint = AUDIOFOCUS_GAIN_TRANSIENT;
-            }
-            TXCServices::instance()->GetAudioFocusManager()->RequestAudioFocus(app_id_, this, hint);
-            m_is_need_play = true;
         }
-        
         handled = true;
     }
-    else if (cRsp.play_behavior == txca_playlist_update_enqueue)
+    else if (cRsp.play_behavior == txca_playlist_update_enqueue || cRsp.play_behavior == txca_playlist_update_enqueue_all)
     {
         std::vector<PtrMedia> ids;
         size_t updated_count = UpdateListItem(cRsp, ids);
-        
+
         if (updated_count > 0)
         {
             CAutoBuffer<const txc_media_t *> msg_list(updated_count);
             int i = 0;
-            for(std::vector<PtrMedia>::iterator iter = ids.begin(); iter != ids.end(); iter++) {
+            for (std::vector<PtrMedia>::iterator iter = ids.begin(); iter != ids.end(); iter++)
+            {
                 msg_list[i++] = &iter->get()->GetInfo();
             }
-            
-            send_message(app_id_, XWM_LIST_UPDATED, XWPARAM(msg_list.Get()), XWPARAM(ids.size()));
-            handled = true;
-        }
-    }
-    else if (cRsp.play_behavior == txca_playlist_replace_enqueue)
-    {
-        std::vector<PtrMedia> ids;
-        size_t updated_count = ReplaceListItem(cRsp, ids);
-        
-        if (updated_count > 0)
-        {
-            CAutoBuffer<const txc_media_t *> msg_list(updated_count);
-            int i = 0;
-            for(std::vector<PtrMedia>::iterator iter = ids.begin(); iter != ids.end(); iter++) {
-                msg_list[i++] = &iter->get()->GetInfo();
-            }
-            
+
             send_message(app_id_, XWM_LIST_UPDATED, XWPARAM(msg_list.Get()), XWPARAM(ids.size()));
             handled = true;
         }
@@ -377,23 +376,24 @@ void PlayerKit::ProcessPlayList(const TXCA_PARAM_RESPONSE &cRsp, bool& handled)
         {
             CAutoBuffer<const txc_media_t *> msg_list(removed_count);
             int i = 0;
-            for(std::vector<PtrMedia>::iterator iter = ids.begin(); iter != ids.end(); iter++) {
+            for (std::vector<PtrMedia>::iterator iter = ids.begin(); iter != ids.end(); iter++)
+            {
                 msg_list[i++] = &iter->get()->GetInfo();
             }
             send_message(app_id_, XWM_MEDIA_REMOVED, XWPARAM(msg_list.Get()), XWPARAM(ids.size()));
         }
         handled = true;
     }
-    
+
     OnSupplementRequest(cRsp, handled);
 }
 
-void PlayerKit::OnSupplementRequest(const TXCA_PARAM_RESPONSE &cRsp, bool& bHandled)
+void PlayerKit::OnSupplementRequest(const TXCA_PARAM_RESPONSE &cRsp, bool &bHandled)
 {
     if (cRsp.context.speak_timeout > 0)
     {
         TLOG_DEBUG("sessionId=%d OnAiAudioRsp %s::OnSupplementRequest speak_timeout=%d", app_id_, GetClassName().c_str(), cRsp.context.speak_timeout);
-    
+
         send_message(app_id_, XWM_SUPPLEMENT_REQUEST, XWPARAM((long)cRsp.context.speak_timeout), XWPARAM(&cRsp));
         bHandled = true;
     }
@@ -409,62 +409,65 @@ size_t PlayerKit::AddList(const TXCA_PARAM_RESPONSE &cRsp, _Out_ PtrMedia &album
 {
     TLOG_DEBUG("sessionId=%d OnAiAudioRsp %s::AddList resource_groups_size=%d", app_id_, GetClassName().c_str(), cRsp.resource_groups_size);
     bool isUp = cRsp.play_behavior == txca_playlist_enqueue_front;
-    if (!isUp)
-    {
-        // 音乐只有第一次需要往上拉取历史记录，所以忽略之后下发的hasMore字段
-        InitList(cRsp.has_more_playlist);
-    }
     
-    bool isNeedAlbum = !isUp && (playlist_.get()->Count() == 0);
+    InitList(cRsp.resource_list_type, isUp, cRsp.has_more_playlist);
+    if(cRsp.resource_groups_size == 0 && isUp && cRsp.resource_list_type == txca_playlist_type_default)
+    {
+        // 往上没有了，就去拉历史
+        send_message(app_id_, XWM_GET_MORE_LIST, XWPARAM(TYPE_GET_HISTORY), XWPARAM(txca_playlist_type_default));
+        return 0;
+    }
+
+    bool isNeedAlbum = !isUp && (control_->PlayListCount(txca_playlist_type_default) == 0) && cRsp.resource_list_type == txca_playlist_type_default;
     std::vector<txc_play_item_t> playlist;
     size_t media_add_count = 0;
-    
+
     for (size_t i = 0; i < cRsp.resource_groups_size; i++)
     {
         size_t res_count = cRsp.resource_groups[i].resources_size;
         txc_play_item_t play_item = {0};
-        
+
         bool bHasMedia = false;
         int nIndex = 0;
         for (size_t j = 0; j < res_count; j++)
         {
             const TXCA_PARAM_RESOURCE *item = cRsp.resource_groups[i].resources + j;
             PtrMedia media;
-            if (ResToMedia(item, media))
+            if (ResToMedia(item, media, cRsp.resource_list_type))
             {
-                int src_index = player_->AddMediaItem(media);
+                int src_index = control_->AddMediaItem(media);
                 if (src_index >= 0)
                 {
                     play_item.group[nIndex] = src_index;
                     play_item.count++;
-                    
+
                     if (isNeedAlbum && album_index < 0 && CanBeAlbum(media))
                     {
                         album_index = src_index;
                         album = media;
                     }
-                    
+
                     ++media_add_count;
                 }
-                
+
                 bHasMedia = true;
                 nIndex++;
             }
         }
-        
+
         if (bHasMedia)
             playlist.push_back(play_item);
     }
-    
+
     if (isUp)
     {
-        playlist_->PushFront(playlist);
+        control_->PlayListPushFront(playlist, (int)cRsp.resource_list_type);
     }
     else
     {
-        playlist_->PushBack(playlist);
+        control_->PlayListPushBack(playlist, (int)cRsp.resource_list_type);
     }
-    
+
     return media_add_count;
 }
 
@@ -474,7 +477,7 @@ bool PlayerKit::CanBeAlbum(const PtrMedia media)
 }
 
 // 将TXCA_PARAM_RESOURCE 转为 Media
-bool PlayerKit::ResToMedia(const TXCA_PARAM_RESOURCE *item, _Out_ PtrMedia &_media)
+bool PlayerKit::ResToMedia(const TXCA_PARAM_RESOURCE *item, _Out_ PtrMedia &_media, int resource_list_type)
 {
     PtrMedia temp_media;
     bool succ = false;
@@ -505,7 +508,7 @@ bool PlayerKit::ResToMedia(const TXCA_PARAM_RESOURCE *item, _Out_ PtrMedia &_med
         {
             strResId = TXCServices::instance()->GetMediaCenter()->GenResourceId();
         }
-        
+
         temp_media = TXCServices::instance()->GetMediaCenter()->GetMedia(strResId);
         if (!temp_media.get())
         {
@@ -514,7 +517,7 @@ bool PlayerKit::ResToMedia(const TXCA_PARAM_RESOURCE *item, _Out_ PtrMedia &_med
             CMediaMusic *mediaMusic = dynamic_cast<CMediaMusic *>(temp_media.get());
             if (mediaMusic)
             {
-                mediaMusic->Init(item->content, item->extend_buffer, item->offset, item->play_count);
+                mediaMusic->Init(item->content, item->extend_buffer, item->offset, item->play_count, resource_list_type);
             }
         }
     }
@@ -539,7 +542,8 @@ bool PlayerKit::ResToMedia(const TXCA_PARAM_RESOURCE *item, _Out_ PtrMedia &_med
             if (mediaText)
             {
                 mediaText->Init(item->content, item->extend_buffer, item->play_count);
-                if (item->play_count == 1) {
+                if (item->play_count == 1)
+                {
                     mediaText->Update(TYPE_TTS_TEXT_TIP);
                 }
             }
@@ -557,14 +561,14 @@ bool PlayerKit::ResToMedia(const TXCA_PARAM_RESOURCE *item, _Out_ PtrMedia &_med
 // 更新元素，一般是更新url和清晰度等信息
 size_t PlayerKit::UpdateListItem(const TXCA_PARAM_RESPONSE &cRsp, std::vector<PtrMedia> &list)
 {
-    PtrMediaList &media_list = player_->GetMediaList();
+    PtrMediaList &media_list = control_->GetMediaList();
     size_t list_count = media_list->Count();
 
     if (list_count <= 0 || cRsp.resource_groups_size <= 0 || cRsp.resource_groups[0].resources_size <= 0)
     {
         return 0;
     }
-    
+
     size_t update_count = 0;
 
     for (size_t i = 0; i < cRsp.resource_groups_size; i++)
@@ -572,10 +576,11 @@ size_t PlayerKit::UpdateListItem(const TXCA_PARAM_RESPONSE &cRsp, std::vector<Pt
         for (size_t j = 0; j < cRsp.resource_groups[i].resources_size; j++)
         {
             const TXCA_PARAM_RESOURCE *item = cRsp.resource_groups[i].resources + j;
-            if (player_->UpdateMediaItem(item) >= 0)
+            if (control_->UpdateMediaItem(item, cRsp.play_behavior == txca_playlist_update_enqueue) >= 0)
             {
                 int media_index = media_list->Find(item->id);
-                if(media_index != -1) {
+                if (media_index != -1)
+                {
                     PtrMedia media = media_list->Get(media_index);
                     list.push_back(media);
                 }
@@ -587,73 +592,49 @@ size_t PlayerKit::UpdateListItem(const TXCA_PARAM_RESPONSE &cRsp, std::vector<Pt
     return update_count;
 }
 
-size_t PlayerKit::ReplaceListItem(const TXCA_PARAM_RESPONSE &cRsp, std::vector<PtrMedia> &list)
-{
-    PtrMediaList &media_list = player_->GetMediaList();
-    size_t list_count = media_list->Count();
-
-    if (list_count <= 0 || cRsp.resource_groups_size <= 0 || cRsp.resource_groups[0].resources_size <= 0)
-    {
-        return 0;
-    }
-
-    size_t replace_count = 0;
-
-    for (size_t i = 0; i < cRsp.resource_groups_size; i++)
-    {
-        for (size_t j = 0; j < cRsp.resource_groups[i].resources_size; j++)
-        {
-            const TXCA_PARAM_RESOURCE *item = cRsp.resource_groups[i].resources + j;
-            if (player_->ReplaceMediaItem(item) >= 0)
-            {
-                int media_index = media_list->Find(item->id);
-                if(media_index != -1) {
-                    PtrMedia media = media_list->Get(media_index);
-                    list.push_back(media);
-                }
-                replace_count++;
-            }
-        }
-    }
-
-    return replace_count;
-}
-
 size_t PlayerKit::RemoveListItem(const TXCA_PARAM_RESPONSE &cRsp, std::vector<PtrMedia> &list)
 {
-    PtrMediaList &media_list = player_->GetMediaList();
+    PtrMediaList &media_list = control_->GetMediaList();
     size_t list_count = media_list->Count();
-    
+
     if (list_count <= 0 || cRsp.resource_groups_size <= 0 || cRsp.resource_groups[0].resources_size <= 0)
     {
         return 0;
     }
     size_t remove_count = 0;
-    
+
     for (size_t i = 0; i < cRsp.resource_groups_size; i++)
     {
         for (size_t j = 0; j < cRsp.resource_groups[i].resources_size; j++)
         {
             const TXCA_PARAM_RESOURCE *item = cRsp.resource_groups[i].resources + j;
-            bool removed = playlist_->Remove(item->id);
-            if(removed){
-                int media_index = media_list->Find(item->id);
-                if(media_index != -1) {
-                    PtrMedia media = media_list->Get(media_index);
-                    list.push_back(media);
-                    media_list->Remove(media_index);
-                    remove_count++;
-                }
+            PtrMedia media = control_->Remove(item->id);
+            if (media.get())
+            {
+                list.push_back(media);
+                remove_count++;
             }
         }
     }
     return remove_count;
 }
-void PlayerKit::InitList(bool has_more)
+void PlayerKit::InitList(TXCA_PLAYLIST_TYPE list_type, bool is_up, bool has_more)
 {
-    PtrMediaList mediaList = player_->GetMediaList();
+    PtrMediaList mediaList = control_->GetMediaList();
     txc_playlist_t playListInfo = mediaList->GetInfo();
-    playListInfo.hasMore = has_more;
+    if(list_type == txca_playlist_type_default) {
+        if(is_up) {
+            playListInfo.has_more_current_up = has_more;
+        } else {
+            playListInfo.has_more_current = has_more;
+        }
+    } else if(list_type == txca_playlist_type_history) {
+        if(is_up) {
+            playListInfo.has_more_history_up = has_more;
+        } else {
+            playListInfo.has_more_history = has_more;
+        }
+    }
     mediaList->SetInfo(&playListInfo);
 }
 
@@ -664,15 +645,7 @@ bool PlayerKit::OnMessage(XWM_EVENT event, XWPARAM arg1, XWPARAM arg2)
 
     if (XWM_PLAYER_STATUS_FINISH == event)
     {
-        PtrMediaList &media_list = player_->GetMediaList();
-        if (media_list->Count() > 0)
-        {
-            send_message(app_id_, XWM_STOP, 0, 0);
-            send_message(app_id_, XWM_LIST_REMOVED, XWPARAM(0), XWPARAM(playlist_->Count()));
-            TLOG_DEBUG("sessionId=%d OnAiAudioRsp %s::OnMessage XWM_LIST_REMOVED", app_id_, GetClassName().c_str());
-            media_list->Clear();
-            playlist_->Clear();
-        }
+        control_->Release();
         TXCServices::instance()->GetAudioFocusManager()->AbandonAudioFocus(this);
     }
 
@@ -686,14 +659,16 @@ AppKitMusic::AppKitMusic(int app_id)
 
 bool AppKitMusic::CanBeAlbum(const PtrMedia media)
 {
-    CMedia* media_ = media.get();
-    if(media_) {
+    CMedia *media_ = media.get();
+    if (media_)
+    {
         return media_->GetInfo().type == TYPE_MUSIC_URL;
-    } else {
+    }
+    else
+    {
         return false;
     }
 }
-
 
 std::string AppKitMusic::GetClassName()
 {
@@ -701,10 +676,9 @@ std::string AppKitMusic::GetClassName()
 }
 
 AppKitFM::AppKitFM(int app_id)
-    : PlayerKit(app_id, REPEAT_SEQUENCE)
+    : PlayerKit(app_id, REPEAT_LOOP)
 {
 }
-
 
 std::string AppKitFM::GetClassName()
 {
@@ -713,10 +687,13 @@ std::string AppKitFM::GetClassName()
 
 bool AppKitFM::CanBeAlbum(const PtrMedia media)
 {
-    CMedia* media_ = media.get();
-    if(media_) {
+    CMedia *media_ = media.get();
+    if (media_)
+    {
         return media_->GetInfo().type == TYPE_MUSIC_URL;
-    } else {
+    }
+    else
+    {
         return false;
     }
 }
@@ -726,10 +703,9 @@ AppKitNew::AppKitNew(int app_id)
 {
 }
 
-
 std::string AppKitNew::GetClassName()
 {
-    return "AppKitFM";
+    return "AppKitNew";
 }
 
 bool AppKitNew::ResToMedia(const TXCA_PARAM_RESOURCE *item, const std::string &description, _Out_ PtrMedia &_media)
@@ -764,10 +740,10 @@ bool AppKitNew::ResToMedia(const TXCA_PARAM_RESOURCE *item, const std::string &d
             if (media_music)
             {
                 media_music->Init(item->content, description.c_str(), item->offset, item->play_count);
-            }
-            
-            if (item->play_count == 1) {
-                media_music->Update(TYPE_MUSIC_URL_TIP);
+                if (item->play_count == 1)
+                {
+                    media_music->Update(TYPE_MUSIC_URL_TIP);
+                }
             }
         }
     }
@@ -799,7 +775,7 @@ bool AppKitNew::ResToMedia(const TXCA_PARAM_RESOURCE *item, const std::string &d
 size_t AppKitNew::AddList(const TXCA_PARAM_RESPONSE &cRsp, PtrMedia &album, int &album_index)
 {
     TLOG_DEBUG("sessionId=%d OnAiAudioRsp %s::AddList resource_groups_size=%d", app_id_, GetClassName().c_str(), cRsp.resource_groups_size);
-    InitList(cRsp.has_more_playlist);
+    InitList(txca_playlist_type_default, false, cRsp.has_more_playlist);
 
     size_t media_count = 0;
     // TODO: 新闻场景的列表资源有多种，可能还需要适配
@@ -813,58 +789,68 @@ size_t AppKitNew::AddList(const TXCA_PARAM_RESPONSE &cRsp, PtrMedia &album, int 
         if (cRsp.response_data)
         {
             rapidjson::Document json_doc;
-            
+
             json_doc.Parse(cRsp.response_data);
-            if (!json_doc.HasParseError()) {
+            if (!json_doc.HasParseError())
+            {
                 rapidjson::Value &data = json_doc["data"];
-                if (data.IsArray()) {
-                    for (unsigned int i = 0; i < data.Size(); i++) {
-                        rapidjson::Value & originItem = data[i];
+                if (data.IsArray())
+                {
+                    for (unsigned int i = 0; i < data.Size(); i++)
+                    {
+                        rapidjson::Value &originItem = data[i];
                         assert(originItem.IsObject());
-                        
+
                         rapidjson::StringBuffer item;
                         rapidjson::Writer<rapidjson::StringBuffer> writer(item);
                         writer.StartObject();
-                        
-                        if (originItem.HasMember("id")) {
+
+                        if (originItem.HasMember("id"))
+                        {
                             std::string idStr = originItem["id"].GetString();
                             writer.Key("playId");
                             writer.String(idStr.c_str());
                         }
-                        
-                        if (originItem.HasMember("source")) {
+
+                        if (originItem.HasMember("source"))
+                        {
                             std::string sourceStr = originItem["source"].GetString();
                             writer.Key("artist");
                             writer.String(sourceStr.c_str());
                         }
-                        
-                        if (originItem.HasMember("title")) {
+
+                        if (originItem.HasMember("title"))
+                        {
                             std::string titleStr = originItem["title"].GetString();
                             writer.Key("name");
                             writer.String(titleStr.c_str());
                         }
-                        
-                        if (originItem.HasMember("summary")) {
+
+                        if (originItem.HasMember("summary"))
+                        {
                             std::string summaryStr = originItem["summary"].GetString();
                             writer.Key("album");
                             writer.String(summaryStr.c_str());
                         }
-                        
-                        if (originItem.HasMember("pic_url")) {
+
+                        if (originItem.HasMember("pic_url"))
+                        {
                             std::string picUrlStr = originItem["pic_url"].GetString();
                             writer.Key("cover");
                             writer.String(picUrlStr.c_str());
                         }
-                        
-                        if (originItem.HasMember("publish_time")) {
+
+                        if (originItem.HasMember("publish_time"))
+                        {
                             std::string pubTimeStr = originItem["publish_time"].GetString();
                             writer.Key("publishTime");
                             writer.String(pubTimeStr.c_str());
                         }
-                        
+
                         writer.EndObject();
-                        
-                        if (originItem.HasMember("id")) {
+
+                        if (originItem.HasMember("id"))
+                        {
                             std::string idStr = originItem["id"].GetString();
                             id2NewInfo[idStr] = item.GetString();
                         }
@@ -884,13 +870,12 @@ size_t AppKitNew::AddList(const TXCA_PARAM_RESPONSE &cRsp, PtrMedia &album, int 
                 PtrMedia media;
                 if (ResToMedia(item, id2NewInfo[item->id], media))
                 {
-                    int src_index = player_->AddMediaItem(media);
+                    int src_index = control_->AddMediaItem(media);
                     if (src_index >= 0)
                     {
                         play_item.group[j] = src_index;
 
-                        if (album_index < 0 && (media.get()->GetInfo().type == TYPE_MUSIC_URL
-                                                || media.get()->GetInfo().type == TYPE_TTS_TEXT))
+                        if (album_index < 0 && (media.get()->GetInfo().type == TYPE_MUSIC_URL || media.get()->GetInfo().type == TYPE_TTS_TEXT))
                         {
                             album_index = src_index;
                             album = media;
@@ -902,7 +887,7 @@ size_t AppKitNew::AddList(const TXCA_PARAM_RESPONSE &cRsp, PtrMedia &album, int 
             playlist.push_back(play_item);
         }
 
-        playlist_->PushBack(playlist);
+        control_->PlayListPushBack(playlist);
     }
     else
     {
@@ -997,7 +982,7 @@ bool AppKitGlobal::PreProcessResourceCommand(const TXCA_PARAM_RES_GROUP *v_group
                                 writer.Key("value");
                                 writer.Double(-volume);
                                 writer.EndObject();
-                                
+
                                 CommonMgr.on_common_control(TYPE_VOLUME_SET, str.GetString());
                             }
                         }
@@ -1019,7 +1004,7 @@ bool AppKitGlobal::PreProcessResourceCommand(const TXCA_PARAM_RES_GROUP *v_group
                                 writer.Key("value");
                                 writer.Double(volume);
                                 writer.EndObject();
-                                
+
                                 CommonMgr.on_common_control(TYPE_VOLUME_SET, str.GetString());
                             }
                         }
@@ -1039,7 +1024,7 @@ bool AppKitGlobal::PreProcessResourceCommand(const TXCA_PARAM_RES_GROUP *v_group
                                     writer.Key("value");
                                     writer.Double(volume);
                                     writer.EndObject();
-                                    
+
                                     CommonMgr.on_common_control(TYPE_VOLUME_SET, str.GetString());
                                 }
                             }
@@ -1056,7 +1041,7 @@ bool AppKitGlobal::PreProcessResourceCommand(const TXCA_PARAM_RES_GROUP *v_group
                                 writer.Key("value");
                                 writer.Int(100);
                                 writer.EndObject();
-                                
+
                                 CommonMgr.on_common_control(TYPE_VOLUME_SET, str.GetString());
                             }
                             break;
@@ -1113,7 +1098,7 @@ bool AppKitGlobal::PreProcessResourceCommand(const TXCA_PARAM_RES_GROUP *v_group
                                 writer.Key("type");
                                 writer.String(resource->content);
                                 writer.EndObject();
-                                
+
                                 CommonMgr.on_common_control(TYPE_FETCH_DEVICE_INFO, str.GetString());
                             }
                             break;
@@ -1145,11 +1130,14 @@ bool OuterSkill::OnAiAudioRsp(const TXCA_PARAM_RESPONSE &cRsp)
 
 bool OuterSkill::OnMessage(XWM_EVENT event, XWPARAM arg1, XWPARAM arg2)
 {
+    TLOG_INFO("OuterSkill::OnMessage event[%s]", Util::ToString(event).c_str());
     bool handled = false;
-
+    if (outer_skill_callback.on_message)
+    {
+        handled = outer_skill_callback.on_message(app_id_, event, arg1, arg2);
+    }
     return handled;
 }
-
 
 std::string OuterSkill::GetClassName()
 {

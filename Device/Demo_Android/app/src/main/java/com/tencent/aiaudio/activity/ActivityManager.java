@@ -53,7 +53,7 @@ public class ActivityManager {
     }
 
     public void finish(int sessionId) {
-        BaseActivity activity = map.get(sessionId);
+        BaseActivity activity = map.remove(sessionId);
         if (activity != null) {
             activity.onSkillIdle();
         }

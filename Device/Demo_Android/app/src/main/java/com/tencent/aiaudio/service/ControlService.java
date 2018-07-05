@@ -18,10 +18,10 @@ package com.tencent.aiaudio.service;
 
 import android.app.Service;
 import android.content.Intent;
+import android.media.AudioManager;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
-import android.os.RemoteException;
 import android.support.annotation.Nullable;
 import android.support.v4.content.LocalBroadcastManager;
 import android.text.TextUtils;
@@ -38,35 +38,39 @@ import com.tencent.aiaudio.activity.WeatherActivity;
 import com.tencent.aiaudio.alarm.AlarmSkillHandler;
 import com.tencent.aiaudio.alarm.DeviceSkillAlarmManager;
 import com.tencent.aiaudio.demo.IControlService;
+import com.tencent.aiaudio.msg.SkillMsgHandler;
 import com.tencent.aiaudio.player.XWeiPlayerMgr;
 import com.tencent.aiaudio.tts.TTSManager;
 import com.tencent.utils.MusicPlayer;
 import com.tencent.utils.ThreadManager;
 import com.tencent.xiaowei.control.Constants;
 import com.tencent.xiaowei.control.IXWeiPlayer;
-import com.tencent.xiaowei.control.XWeiAudioFocusManager;
 import com.tencent.xiaowei.control.XWeiControl;
 import com.tencent.xiaowei.control.info.XWeiMediaInfo;
 import com.tencent.xiaowei.control.info.XWeiPlayerInfo;
 import com.tencent.xiaowei.control.info.XWeiPlaylistInfo;
 import com.tencent.xiaowei.control.info.XWeiSessionInfo;
+import com.tencent.xiaowei.def.XWCommonDef;
 import com.tencent.xiaowei.info.MediaMetaInfo;
 import com.tencent.xiaowei.info.XWAppInfo;
-import com.tencent.xiaowei.info.XWContextInfo;
 import com.tencent.xiaowei.info.XWResponseInfo;
 import com.tencent.xiaowei.sdk.XWSDK;
 import com.tencent.xiaowei.util.JsonUtil;
+import com.tencent.xiaowei.util.QLog;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 
 import static android.content.Intent.FLAG_ACTIVITY_NEW_TASK;
+import static com.tencent.xiaowei.control.Constants.GET_MORE_LIST_TYPE.TYPE_GET_HISTORY;
+import static com.tencent.xiaowei.control.Constants.GET_MORE_LIST_TYPE.TYPE_GET_MORE;
+import static com.tencent.xiaowei.control.Constants.GET_MORE_LIST_TYPE.TYPE_GET_MORE_UP;
 import static com.tencent.xiaowei.control.Constants.SkillIdDef.SKILL_ID_ALARM;
 import static com.tencent.xiaowei.control.Constants.SkillIdDef.SKILL_ID_FM;
 import static com.tencent.xiaowei.control.Constants.SkillIdDef.SKILL_ID_MUSIC;
 import static com.tencent.xiaowei.control.Constants.SkillIdDef.SKILL_ID_New;
-import static com.tencent.xiaowei.control.Constants.SkillIdDef.SKILL_ID_QQ_CALL;
+import static com.tencent.xiaowei.control.Constants.SkillIdDef.SKILL_ID_QQ_MSG;
 import static com.tencent.xiaowei.control.Constants.SkillIdDef.SKILL_ID_TRIGGER_ALARM;
 import static com.tencent.xiaowei.control.Constants.SkillIdDef.SKILL_ID_Unknown;
 import static com.tencent.xiaowei.control.Constants.SkillIdDef.SKILL_ID_WEATHER;
@@ -95,18 +99,22 @@ public class ControlService extends Service implements XWeiPlayerMgr.SkillUIEven
     public static final String ACTION_MUSIC_ON_REPEAT_MODE = "action_music_on_repeat_mode";
     public static final String ACTION_MUSIC_ON_STOP = "action_music_on_stop";
     public static final String ACTION_MUSIC_ON_UPDATE_PLAY_LIST = "action_music_on_update_play_list";
+    public static final String ACTION_MUSIC_ON_UPDATE_HISTORY_PLAY_LIST = "action_music_on_update_history_play_list";
     public static final String ACTION_MUSIC_ON_UNKEEP = "action_music_on_unkeep";
     public static final String ACTION_MUSIC_ON_KEEP = "action_music_on_keep";
     private static final String TAG = ControlService.class.getSimpleName();
     private SparseArray<String> session2CurPlayId = new SparseArray<>();
     private long lastUpdateTime = 0;
-    private SparseArray<ArrayList<String>> session2PlayIdArray = new SparseArray<>();
+    private SparseArray<ArrayList<String>> session2PlayIdArray = new SparseArray<>();// sessionId 找到playlist的playid列表
+    private SparseArray<ArrayList<String>> session2HistoryPlayIdArray = new SparseArray<>();// sessionId 找到history playlist的playid列表
     private HashMap<String, MediaMetaInfo> id2PlayInfo = new HashMap<>();
     private volatile boolean isLoadingMore;
     private Handler mHandler = new Handler();
 
-    private XWeiAudioFocusManager.OnAudioFocusChangeListener listener;
+    private AudioManager.OnAudioFocusChangeListener listener;
     private AlarmSkillHandler alarmSkillHandler; // 处理AlarmSkillHandler
+    private SkillMsgHandler msgHandler;         // 消息发送/播放处理
+
 
     @Override
     public void onCreate() {
@@ -114,8 +122,10 @@ public class ControlService extends Service implements XWeiPlayerMgr.SkillUIEven
 
         XWeiPlayerMgr.setPlayerEventListener(this);
         alarmSkillHandler = new AlarmSkillHandler(getApplicationContext());
+        msgHandler = new SkillMsgHandler(getApplicationContext());
         XWeiControl.getInstance().getXWeiOuterSkill().registerSkillIdOrSkillName(SKILL_ID_ALARM, alarmSkillHandler);
         XWeiControl.getInstance().getXWeiOuterSkill().registerSkillIdOrSkillName(SKILL_ID_TRIGGER_ALARM, alarmSkillHandler);
+        XWeiControl.getInstance().getXWeiOuterSkill().registerSkillIdOrSkillName(SKILL_ID_QQ_MSG, msgHandler);
 
         DeviceSkillAlarmManager.instance().init(getApplication());
         DeviceSkillAlarmManager.instance().startDeviceAllAlarm();
@@ -134,19 +144,18 @@ public class ControlService extends Service implements XWeiPlayerMgr.SkillUIEven
         alarmSkillHandler = null;
         XWeiControl.getInstance().getXWeiOuterSkill().unRegisterSkillIdOrSkillName(SKILL_ID_ALARM);
         XWeiControl.getInstance().getXWeiOuterSkill().unRegisterSkillIdOrSkillName(SKILL_ID_TRIGGER_ALARM);
-        XWeiControl.getInstance().getXWeiOuterSkill().unRegisterSkillIdOrSkillName(SKILL_ID_QQ_CALL);
+        XWeiControl.getInstance().getXWeiOuterSkill().unRegisterSkillIdOrSkillName(SKILL_ID_QQ_MSG);
     }
 
     @Override
     public void onPlaylistAddAlbum(int sessionId, XWeiMediaInfo mediaInfo) {
         XWeiPlaylistInfo playlistInfo = XWeiControl.getInstance().getMediaTool().txcGetPlaylistInfo(sessionId);
-        Log.d(TAG, "onPlaylistAddAlbum: " + playlistInfo.count);
         startSkillUI(sessionId, mediaInfo);
     }
 
     @Override
-    public void onPlaylistAddItem(int sessionId, boolean isFront, XWeiMediaInfo[] mediaInfoArray) {
-        addPlayListForSkill(sessionId, isFront, mediaInfoArray);
+    public void onPlaylistAddItem(int sessionId, int resourceListType, boolean isFront, XWeiMediaInfo[] mediaInfoArray) {
+        addPlayListForSkill(sessionId, resourceListType, isFront, mediaInfoArray);
     }
 
     @Override
@@ -168,7 +177,7 @@ public class ControlService extends Service implements XWeiPlayerMgr.SkillUIEven
             return;
         }
 
-        if (sessionInfo.skillId.equals(SKILL_ID_MUSIC) || sessionInfo.skillId.equals(SKILL_ID_FM) || sessionInfo.skillName.contains("skills")) {
+        if (sessionInfo.skillId.equals(SKILL_ID_MUSIC) || sessionInfo.skillId.equals(SKILL_ID_FM)) {
 
             if (mediaInfo.mediaType == TYPE_MUSIC_URL) {
                 MediaMetaInfo currentPlayInfo = JsonUtil.getObject(mediaInfo.description, MediaMetaInfo.class);
@@ -183,13 +192,6 @@ public class ControlService extends Service implements XWeiPlayerMgr.SkillUIEven
                     getDetailInfoIfNeed(sessionInfo.skillName, sessionInfo.skillId, id2PlayInfo.get(currentPlayInfo.playId));
 
                     refreshPlayListIfNeed(sessionId, false);
-
-                    // 预加载播放资源
-                    ArrayList<String> playIdArray = session2PlayIdArray.get(sessionId);
-                    int index = playIdArray == null ? -1 : playIdArray.indexOf(currentPlayInfo.playId);
-                    if (index != -1 && index + 1 >= playIdArray.size()) {
-                        loadMorePlayList(sessionId);
-                    }
                 }
             }
         } else if (sessionInfo.skillId.equals(SKILL_ID_New)) {
@@ -251,53 +253,59 @@ public class ControlService extends Service implements XWeiPlayerMgr.SkillUIEven
     public void onTips(int tipsType) {
         switch (tipsType) {
             case Constants.TXPlayerTipsType.PLAYER_TIPS_NEXT_FAILURE:
-                XWSDK.getInstance().requestTTS("当前列表没有更多了，您可以重新点播".getBytes(), new XWContextInfo(), new XWSDK.RequestListener() {
+                XWSDK.getInstance().requestTTS("当前列表没有更多了，您可以重新点播".getBytes(), new XWSDK.RequestListener() {
                     @Override
                     public boolean onRequest(int event, final XWResponseInfo rspData, byte[] extendData) {
-                        listener = new XWeiAudioFocusManager.OnAudioFocusChangeListener() {
+                        CommonApplication.mAudioManager.abandonAudioFocus(listener);
+                        listener = new AudioManager.OnAudioFocusChangeListener() {
                             @Override
                             public void onAudioFocusChange(int focusChange) {
-                                if (focusChange == XWeiAudioFocusManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK) {
+                                if (focusChange == AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK) {
                                     MusicPlayer.getInstance().playMediaInfo(rspData.resources[0].resources[0], new MusicPlayer.OnPlayListener() {
                                         @Override
                                         public void onCompletion(int error) {
-                                            XWeiAudioFocusManager.getInstance().abandonAudioFocus(listener);
+                                            CommonApplication.mAudioManager.abandonAudioFocus(listener);
                                         }
 
                                     });
                                 } else {
                                     MusicPlayer.getInstance().stop();
                                 }
-
                             }
                         };
-                        XWeiAudioFocusManager.getInstance().requestAudioFocus(listener, XWeiAudioFocusManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK);
+                        int ret = CommonApplication.mAudioManager.requestAudioFocus(listener, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK);
+                        if (ret == AudioManager.AUDIOFOCUS_REQUEST_GRANTED) {
+                            listener.onAudioFocusChange(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK);
+                        }
                         return true;
                     }
                 });
                 break;
             case Constants.TXPlayerTipsType.PLAYER_TIPS_PREV_FAILURE:
-                XWSDK.getInstance().requestTTS("当前列表没有上一首了".getBytes(), new XWContextInfo(), new XWSDK.RequestListener() {
+                XWSDK.getInstance().requestTTS("当前列表没有上一首了".getBytes(), new XWSDK.RequestListener() {
                     @Override
                     public boolean onRequest(int event, final XWResponseInfo rspData, byte[] extendData) {
-                        listener = new XWeiAudioFocusManager.OnAudioFocusChangeListener() {
+                        CommonApplication.mAudioManager.abandonAudioFocus(listener);
+                        listener = new AudioManager.OnAudioFocusChangeListener() {
                             @Override
                             public void onAudioFocusChange(int focusChange) {
-                                if (focusChange == XWeiAudioFocusManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK) {
+                                if (focusChange == AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK) {
                                     MusicPlayer.getInstance().playMediaInfo(rspData.resources[0].resources[0], new MusicPlayer.OnPlayListener() {
                                         @Override
                                         public void onCompletion(int error) {
-                                            XWeiAudioFocusManager.getInstance().abandonAudioFocus(listener);
+                                            CommonApplication.mAudioManager.abandonAudioFocus(listener);
                                         }
 
                                     });
                                 } else {
                                     MusicPlayer.getInstance().stop();
                                 }
-
                             }
                         };
-                        XWeiAudioFocusManager.getInstance().requestAudioFocus(listener, XWeiAudioFocusManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK);
+                        int ret = CommonApplication.mAudioManager.requestAudioFocus(listener, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK);
+                        if (ret == AudioManager.AUDIOFOCUS_REQUEST_GRANTED) {
+                            listener.onAudioFocusChange(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK);
+                        }
                         return true;
                     }
                 });
@@ -313,6 +321,52 @@ public class ControlService extends Service implements XWeiPlayerMgr.SkillUIEven
         }
     }
 
+    @Override
+    public void onGetMoreList(int sessionId, final int type, final String playId) {
+        XWeiSessionInfo sessionInfo = XWeiControl.getInstance().getAppTool().txcGetSession(sessionId);
+        if (sessionInfo == null) {
+            return;
+        }
+        final XWAppInfo appInfo = new XWAppInfo();
+        appInfo.name = sessionInfo.skillName;
+        appInfo.ID = sessionInfo.skillId;
+
+        if (type == TYPE_GET_HISTORY) {
+            // 可以获取到历史播放过的歌单，后台会存储一部分数据
+            mHandler.post(new Runnable() {
+                @Override
+                public void run() {
+                    XWSDK.getInstance().request("PLAY_RESOURCE", "get_history",
+                            "{\"skill_info\":{\"id\":\"" + appInfo.ID + "\",\"name\":\"" + appInfo.name + "\"},\"cur_play_id\":\"" + playId + "\"}", new XWSDK.OnRspListener() {
+                                @Override
+                                public void onRsp(String voiceId, int error, String json) {
+                                    QLog.d(TAG, "get_history:" + json);
+                                    XWResponseInfo rspData = XWResponseInfo.fromCmdJson(json);
+                                    if (rspData.resources != null && rspData.resources.length > 0)
+                                        XWeiControl.getInstance().processResponse(voiceId, rspData, null);
+                                }
+                            });
+                }
+            });
+        } else if (type == TYPE_GET_MORE || type == TYPE_GET_MORE_UP) {
+            mHandler.postDelayed(new Runnable() {
+                @Override
+                public void run() {
+                    XWSDK.getInstance().request("PLAY_RESOURCE", "get_more",
+                            "{\"skill_info\":{\"id\":\"" + appInfo.ID + "\",\"name\":\"" + appInfo.name + "\"},\"play_id\":\"" + playId + "\",\"is_up\":" + (type == 1) + "}", new XWSDK.OnRspListener() {
+                                @Override
+                                public void onRsp(String voiceId, int error, String json) {
+                                    QLog.d(TAG, "get_more:" + json);
+                                    XWResponseInfo rspData = XWResponseInfo.fromCmdJson(json);
+                                    XWeiControl.getInstance().processResponse(voiceId, rspData, null);
+                                }
+                            });
+                }
+            }, 300);
+
+        }
+    }
+
     /**
      * 根据响应结果启动通用SKill场景界面，例如天气，新闻，百科
      *
@@ -322,17 +376,6 @@ public class ControlService extends Service implements XWeiPlayerMgr.SkillUIEven
     private void startSkillUI(int sessionId, XWeiMediaInfo mediaInfo) {
         XWeiSessionInfo sessionInfo = XWeiControl.getInstance().getAppTool().txcGetSession(sessionId);
         if (sessionInfo == null || (TextUtils.isEmpty(sessionInfo.skillName) || TextUtils.isEmpty(sessionInfo.skillId))) {
-            return;
-        }
-        // 第三方skill Test
-        if(sessionInfo.skillName.contains("skills")){
-            Intent intent = new Intent(getApplicationContext(), MusicActivity.class);
-            intent.addFlags(FLAG_ACTIVITY_NEW_TASK);
-            intent.putExtra(EXTRA_KEY_START_SKILL_SESSION_ID, sessionId);
-            intent.putExtra(EXTRA_KEY_START_SKILL_DATA, mediaInfo.description);
-            intent.putExtra(EXTRA_KEY_START_SKILL_NAME, sessionInfo.skillName);
-            intent.putExtra(EXTRA_KEY_START_SKILL_ID, sessionInfo.skillId);
-            startActivity(intent);
             return;
         }
 
@@ -354,7 +397,6 @@ public class ControlService extends Service implements XWeiPlayerMgr.SkillUIEven
                 intent.putExtra(EXTRA_KEY_START_SKILL_NAME, sessionInfo.skillName);
                 intent.putExtra(EXTRA_KEY_START_SKILL_ID, sessionInfo.skillId);
                 startActivity(intent);
-                getHistoryList(sessionId);
                 break;
             }
             case SKILL_ID_FM: {
@@ -415,13 +457,14 @@ public class ControlService extends Service implements XWeiPlayerMgr.SkillUIEven
      * @param sessionId      场景sessionId
      * @param mediaInfoArray 播放资源
      */
-    private void addPlayListForSkill(int sessionId, boolean isFront, XWeiMediaInfo[] mediaInfoArray) {
-        ArrayList<String> playIdArray = session2PlayIdArray.get(sessionId);
+    private void addPlayListForSkill(int sessionId, int resourceListType, boolean isFront, XWeiMediaInfo[] mediaInfoArray) {
+        QLog.d(TAG, "addPlayListForSkill sessionId=" + sessionId + ",resourceListType=" + resourceListType + ",isFront=" + isFront + ",mediaInfoArray.length :" + mediaInfoArray.length);
+        SparseArray<ArrayList<String>> list = resourceListType == XWCommonDef.ResourceListType.DEFAULT ? session2PlayIdArray : session2HistoryPlayIdArray;
+        ArrayList<String> playIdArray = list.get(sessionId);
         if (playIdArray == null) {
             playIdArray = new ArrayList<>();
         }
 
-        Log.d(TAG, "addPlayListForSkill mediaInfoArray.length :" + mediaInfoArray.length);
         int i = 0;
         for (XWeiMediaInfo info : mediaInfoArray) {
             MediaMetaInfo item = JsonUtil.getObject(info.description, MediaMetaInfo.class);
@@ -436,11 +479,11 @@ public class ControlService extends Service implements XWeiPlayerMgr.SkillUIEven
             }
         }
 
-        session2PlayIdArray.put(sessionId, playIdArray);
+        list.put(sessionId, playIdArray);
 
         Bundle bundle = new Bundle();
         bundle.putInt(EXTRA_KEY_START_SKILL_SESSION_ID, sessionId);
-        sendBroadcast(ACTION_MUSIC_ON_UPDATE_PLAY_LIST, bundle);
+        sendBroadcast(resourceListType == XWCommonDef.ResourceListType.DEFAULT ? ACTION_MUSIC_ON_UPDATE_PLAY_LIST : ACTION_MUSIC_ON_UPDATE_HISTORY_PLAY_LIST, bundle);
     }
 
     /**
@@ -450,11 +493,6 @@ public class ControlService extends Service implements XWeiPlayerMgr.SkillUIEven
      * @param mediaInfoArray 播放资源
      */
     private void updatePlayListForSkill(int sessionId, XWeiMediaInfo[] mediaInfoArray) {
-        ArrayList<String> playIdArray = session2PlayIdArray.get(sessionId);
-        if (playIdArray == null) {
-            playIdArray = new ArrayList<>();
-        }
-
         Log.d(TAG, "updatePlayListForSkill mediaInfoArray.length :" + mediaInfoArray.length);
         for (XWeiMediaInfo info : mediaInfoArray) {
             try {
@@ -465,10 +503,7 @@ public class ControlService extends Service implements XWeiPlayerMgr.SkillUIEven
             } catch (Exception e) {
                 e.printStackTrace();
             }
-
         }
-
-        session2PlayIdArray.put(sessionId, playIdArray);
 
         Bundle bundle = new Bundle();
         bundle.putInt(EXTRA_KEY_START_SKILL_SESSION_ID, sessionId);
@@ -482,11 +517,6 @@ public class ControlService extends Service implements XWeiPlayerMgr.SkillUIEven
      * @param mediaInfoArray 播放资源
      */
     private void removePlayListForSkill(int sessionId, XWeiMediaInfo[] mediaInfoArray) {
-        ArrayList<String> playIdArray = session2PlayIdArray.get(sessionId);
-        if (playIdArray == null) {
-            return;
-        }
-
         ArrayList<String> removePlayIdArray = new ArrayList<>();
         for (XWeiMediaInfo info : mediaInfoArray) {
             MediaMetaInfo item = JsonUtil.getObject(info.description, MediaMetaInfo.class);
@@ -496,12 +526,25 @@ public class ControlService extends Service implements XWeiPlayerMgr.SkillUIEven
             }
         }
 
-        playIdArray.removeAll(removePlayIdArray);
-        session2PlayIdArray.put(sessionId, playIdArray);
+        ArrayList<String> playIdArray = session2PlayIdArray.get(sessionId);
+        boolean updateDefaultPlayList = false;
+        boolean updateHistoryPlayList = false;
+        if (playIdArray != null) {
+            updateDefaultPlayList = playIdArray.removeAll(removePlayIdArray);
 
+        }
+        playIdArray = session2HistoryPlayIdArray.get(sessionId);
+        if (playIdArray != null) {
+            updateHistoryPlayList = playIdArray.removeAll(removePlayIdArray);
+        }
         Bundle bundle = new Bundle();
         bundle.putInt(EXTRA_KEY_START_SKILL_SESSION_ID, sessionId);
-        sendBroadcast(ACTION_MUSIC_ON_UPDATE_PLAY_LIST, bundle);
+        if (updateDefaultPlayList) {
+            sendBroadcast(ACTION_MUSIC_ON_UPDATE_PLAY_LIST, bundle);
+        }
+        if (updateHistoryPlayList) {
+            sendBroadcast(ACTION_MUSIC_ON_UPDATE_HISTORY_PLAY_LIST, bundle);
+        }
     }
 
     private void sendBroadcast(String action, Bundle extra) {
@@ -527,13 +570,20 @@ public class ControlService extends Service implements XWeiPlayerMgr.SkillUIEven
                     XWAppInfo appInfo = new XWAppInfo();
                     appInfo.name = skillName;
                     appInfo.ID = skillId;
-                    XWSDK.getInstance().getPlayDetailInfo(appInfo, new String[]{mediaMetaInfo.playId}, new XWSDK.RequestListener() {
-                        @Override
-                        public boolean onRequest(int event, XWResponseInfo rspData, byte[] extendData) {
-                            // 不处理
-                            return XWeiControl.getInstance().processResponse(rspData.voiceID, rspData, extendData);
-                        }
-                    });
+                    ArrayList<String> list = new ArrayList<>(1);
+                    list.add(mediaMetaInfo.playId);
+                    XWSDK.getInstance().request("PLAY_RESOURCE", "get_detail",
+                            "{\"skill_info\":{\"id\":\"" + appInfo.ID + "\",\"name\":\"" + appInfo.name + "\"},\"play_ids\":" + JsonUtil.toJson(list) + "}", new XWSDK.OnRspListener() {
+                                @Override
+                                public void onRsp(String voiceId, int error, String json) {
+                                    QLog.d(TAG, "get_detail:" + json);
+                                    XWResponseInfo rspData = XWResponseInfo.fromCmdJson(json);
+                                    // 让控制层处理具体的数据
+                                    if (rspData.resources != null && rspData.resources.length > 0)
+                                        XWeiControl.getInstance().processResponse(voiceId, rspData, null);
+
+                                }
+                            });
                 }
             }
         };
@@ -542,15 +592,14 @@ public class ControlService extends Service implements XWeiPlayerMgr.SkillUIEven
     }
 
     /**
-     * url过期则刷新列表
+     * url过期或者需要切换品质则刷新列表
      *
      * @param sessionId 场景id
      */
     private void refreshPlayListIfNeed(final int sessionId, boolean isForce) {
         final XWeiSessionInfo sessionInfo = XWeiControl.getInstance().getAppTool().txcGetSession(sessionId);
 
-        if (!isForce && (System.currentTimeMillis() - lastUpdateTime) < 24 * 3600 * 1000
-                && sessionInfo.skillId.equals(SKILL_ID_MUSIC)) {
+        if (!isForce && (System.currentTimeMillis() - lastUpdateTime) < 24 * 3600 * 1000) {
             return;
         }
 
@@ -562,90 +611,40 @@ public class ControlService extends Service implements XWeiPlayerMgr.SkillUIEven
                 appInfo.name = sessionInfo.skillName;
                 appInfo.ID = sessionInfo.skillId;
                 ArrayList<String> playIdArray = session2PlayIdArray.get(sessionId);
-                String[] data = new String[playIdArray.size()];
-                playIdArray.toArray(data);
-
-                XWSDK.getInstance().refreshPlayList(appInfo, data, new XWSDK.RequestListener() {
-                    @Override
-                    public boolean onRequest(int event, XWResponseInfo rspData, byte[] extendData) {
-                        lastUpdateTime = System.currentTimeMillis();
-                        return XWeiControl.getInstance().processResponse(rspData.voiceID, rspData, extendData);
+                ArrayList<String> historyPlayIdArray = session2HistoryPlayIdArray.get(sessionId);
+                ArrayList<String> playIds = new ArrayList<>();
+                if (playIdArray != null)
+                    playIds.addAll(playIdArray);
+                if (historyPlayIdArray != null)
+                    playIds.addAll(historyPlayIdArray);
+                ArrayList<String> list = new ArrayList<>();
+                while (playIds.size() > 0) {
+                    // 需要拆分请求
+                    list.clear();
+                    int count = Math.min(30, playIds.size());
+                    for (int i = 0; i < count; i++) {
+                        list.add(playIds.remove(0));
                     }
-                });
+                    XWSDK.getInstance().request("PLAY_RESOURCE", "refresh",
+                            "{\"skill_info\":{\"id\":\"" + appInfo.ID + "\",\"name\":\"" + appInfo.name + "\"},\"play_ids\":" + JsonUtil.toJson(list) + "}", new XWSDK.OnRspListener() {
+                                @Override
+                                public void onRsp(String voiceId, int error, String json) {
+                                    QLog.d(TAG, "refresh:" + json);
+                                    XWResponseInfo rspData = XWResponseInfo.fromCmdJson(json);
+                                    // 让控制层处理具体的数据
+                                    if (rspData.resources != null && rspData.resources.length > 0)
+                                        XWeiControl.getInstance().processResponse(voiceId, rspData, null);
+                                }
+                            });
+                }
             }
         });
-    }
-
-
-    /**
-     * 根据sessionId预加载播放资源
-     *
-     * @param sessionId 场景sessionId
-     */
-    private void loadMorePlayList(int sessionId) {
-        ArrayList<String> playIdList = session2PlayIdArray.get(sessionId);
-        if (playIdList == null) {
-            return;
-        }
-
-        XWeiPlaylistInfo playlistInfo = XWeiControl.getInstance().getMediaTool().txcGetPlaylistInfo(sessionId);
-        XWeiSessionInfo sessionInfo = XWeiControl.getInstance().getAppTool().txcGetSession(sessionId);
-
-        Log.d(TAG, "hasMore: " + playlistInfo.hasMore + " isLoadingMore: " + isLoadingMore);
-        if (playlistInfo.hasMore && !isLoadingMore) {
-            isLoadingMore = true;
-
-            XWAppInfo appInfo = new XWAppInfo();
-            appInfo.name = sessionInfo.skillName;
-            appInfo.ID = sessionInfo.skillId;
-
-            XWSDK.getInstance().getMorePlaylist(appInfo, playIdList.get(playIdList.size() - 1), 6, false, new XWSDK.RequestListener() {
-                @Override
-                public boolean onRequest(int event, XWResponseInfo rspData, byte[] extendData) {
-                    // 让控制层处理具体的数据
-                    isLoadingMore = false;
-                    return XWeiControl.getInstance().processResponse(rspData.voiceID, rspData, extendData);
-                }
-            });
-        }
-    }
-
-    /**
-     * 可以获取到历史播放过的歌单，后台会存储一部分数据
-     *
-     * @param sessionId
-     */
-    private void getHistoryList(final int sessionId) {
-        mHandler.postDelayed(new Runnable() {
-            @Override
-            public void run() {
-                XWeiSessionInfo sessionInfo = XWeiControl.getInstance().getAppTool().txcGetSession(sessionId);
-                ArrayList<String> playIdList = session2PlayIdArray.get(sessionId);
-                if (playIdList == null) {
-                    mHandler.postDelayed(this, 500);
-                    return;
-                }
-
-                XWAppInfo appInfo = new XWAppInfo();
-                appInfo.name = sessionInfo.skillName;
-                appInfo.ID = sessionInfo.skillId;
-
-                XWSDK.getInstance().getMorePlaylist(appInfo, playIdList.get(0), 20, true, new XWSDK.RequestListener() {
-                    @Override
-                    public boolean onRequest(int event, XWResponseInfo rspData, byte[] extendData) {
-                        // 让控制层处理具体的数据
-                        return XWeiControl.getInstance().processResponse(rspData.voiceID, rspData, extendData);
-                    }
-                });
-            }
-        }, 300);
-
     }
 
     private class IControlServiceImpl extends IControlService.Stub {
 
         @Override
-        public int getCurrentPlayMode(int sessionId) throws RemoteException {
+        public int getCurrentPlayMode(int sessionId) {
             XWeiPlayerInfo playerInfo = XWeiControl.getInstance().getMediaTool().txcGetPlayerInfo(sessionId);
             if (playerInfo != null) {
                 return playerInfo.repeatMode;
@@ -655,28 +654,28 @@ public class ControlService extends Service implements XWeiPlayerMgr.SkillUIEven
         }
 
         @Override
-        public boolean isPlaying(int sessionId) throws RemoteException {
+        public boolean isPlaying(int sessionId) {
 
             XWeiPlayerInfo playerInfo = XWeiControl.getInstance().getMediaTool().txcGetPlayerInfo(sessionId);
             return playerInfo != null && playerInfo.status == Constants.XWeiInnerPlayerStatus.STATUS_PLAY;
         }
 
         @Override
-        public int getCurrentPosition(int sessionId) throws RemoteException {
+        public int getCurrentPosition(int sessionId) {
             IXWeiPlayer player = XWeiControl.getInstance().getXWeiPlayerMgr().getXWeiPlayer(sessionId);
 
             return player != null ? player.getCurrentPosition() : 0;
         }
 
         @Override
-        public int getDuration(int sessionId) throws RemoteException {
+        public int getDuration(int sessionId) {
             IXWeiPlayer player = XWeiControl.getInstance().getXWeiPlayerMgr().getXWeiPlayer(sessionId);
 
             return player != null ? player.getDuration() : 0;
         }
 
         @Override
-        public void seekTo(int sessionId, int position) throws RemoteException {
+        public void seekTo(int sessionId, int position) {
             IXWeiPlayer player = XWeiControl.getInstance().getXWeiPlayerMgr().getXWeiPlayer(sessionId);
 
             if (player != null) {
@@ -685,7 +684,7 @@ public class ControlService extends Service implements XWeiPlayerMgr.SkillUIEven
         }
 
         @Override
-        public List<MediaMetaInfo> getCurrentMediaList(int sessionId) throws RemoteException {
+        public List<MediaMetaInfo> getCurrentMediaList(int sessionId) {
             ArrayList<MediaMetaInfo> playList = new ArrayList<>();
 
             ArrayList<String> playIdArray = session2PlayIdArray.get(sessionId);
@@ -700,28 +699,69 @@ public class ControlService extends Service implements XWeiPlayerMgr.SkillUIEven
         }
 
         @Override
-        public String[] getCurrentPlayIdList(int sessionId) throws RemoteException {
+        public List<MediaMetaInfo> getCurrentHistoryMediaList(int sessionId) {
+            ArrayList<MediaMetaInfo> playList = new ArrayList<>();
 
-            ArrayList<String> playIdArray = session2PlayIdArray.get(sessionId);
-            String[] data = new String[playIdArray.size()];
+            ArrayList<String> playIdArray = session2HistoryPlayIdArray.get(sessionId);
 
-            return playIdArray.toArray(data);
+            if (playIdArray != null) {
+                for (String playId : playIdArray) {
+                    playList.add(id2PlayInfo.get(playId));
+                }
+            }
+
+            return playList;
         }
 
         @Override
-        public MediaMetaInfo getCurrentMediaInfo(int sessionId) throws RemoteException {
+        public MediaMetaInfo getCurrentMediaInfo(int sessionId) {
             String playId = session2CurPlayId.get(sessionId);
 
             return id2PlayInfo.get(playId);
         }
 
         @Override
-        public void getMoreList(int sessionId) throws RemoteException {
-            loadMorePlayList(sessionId);
+        public void getMoreList(final int sessionId, final boolean isUp) {
+            // UI滑动到底 根据sessionId预加载播放资源，如果已经在拉了，就不重复加载，并判断是否需要拉取。
+            final ArrayList<String> playIdList = session2PlayIdArray.get(sessionId);
+            if (playIdList == null || playIdList.size() == 0) {
+                return;
+            }
+
+            XWeiPlaylistInfo playlistInfo = XWeiControl.getInstance().getMediaTool().txcGetPlaylistInfo(sessionId);
+            XWeiSessionInfo sessionInfo = XWeiControl.getInstance().getAppTool().txcGetSession(sessionId);
+
+            QLog.d(TAG, "playlistInfo: " + playlistInfo + " isLoadingMore: " + isLoadingMore);
+            if (isLoadingMore) {
+                return;
+            }
+            // 没上拉取了，并且没有历史，就查一下历史列表
+            if (isUp && !playlistInfo.hasMoreCurrentUp && playlistInfo.hasHistory && session2HistoryPlayIdArray.get(sessionId) != null && session2HistoryPlayIdArray.get(sessionId).size() == 0) {
+                onGetMoreList(sessionId, TYPE_GET_HISTORY, playIdList.get(0));
+            }
+            if (((playlistInfo.hasMoreCurrent && !isUp) || (playlistInfo.hasMoreCurrentUp && isUp))) {
+                isLoadingMore = true;
+
+                XWAppInfo skill = new XWAppInfo();
+                skill.name = sessionInfo.skillName;
+                skill.ID = sessionInfo.skillId;
+
+                XWSDK.getInstance().request("PLAY_RESOURCE", "get_more",
+                        "{\"skill_info\":{\"id\":\"" + skill.ID + "\",\"name\":\"" + skill.name + "\"},\"play_id\":\"" + (isUp ? playIdList.get(0) : playIdList.get(playIdList.size() - 1)) + "\",\"is_up\":" + isUp + "}", new XWSDK.OnRspListener() {
+                            @Override
+                            public void onRsp(String voiceId, int error, String json) {
+                                QLog.d(TAG, "get_more ui:" + json);
+                                XWResponseInfo rspData = XWResponseInfo.fromCmdJson(json);
+                                // 让控制层处理具体的数据
+                                isLoadingMore = false;
+                                XWeiControl.getInstance().processResponse(voiceId, rspData, null);
+                            }
+                        });
+            }
         }
 
         @Override
-        public void refreshPlayList(final int sessionId) throws RemoteException {
+        public void refreshPlayList(final int sessionId) {
             refreshPlayListIfNeed(sessionId, true);
         }
 

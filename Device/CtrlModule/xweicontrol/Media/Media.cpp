@@ -24,6 +24,7 @@ CMedia::CMedia()
     memset(&info_, 0, sizeof(info_));
     offset_ = 0;
     play_count_ = 0;
+    belong_list_type_ = txca_playlist_type_default;
 }
 
 const txc_media_t &CMedia::GetInfo()
@@ -45,6 +46,10 @@ int CMedia::GetPlayCnt()
     return play_count_;
 }
 
+bool CMedia::Belong(int list_type)
+{
+    return (int)belong_list_type_ == list_type || list_type == -1;
+}
 CMediaPiece::~CMediaPiece()
 {
 }

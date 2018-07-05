@@ -96,12 +96,7 @@
             android:screenOrientation="landscape"
             android:windowSoftInputMode="adjustPan|stateHidden" />
         <activity
-            android:name="com.tencent.aiaudio.activity.AlarmActivity"
-            android:launchMode="singleTask"
-            android:screenOrientation="landscape"
-            android:windowSoftInputMode="adjustPan|stateHidden" />
-        <activity
-            android:name="com.tencent.aiaudio.activity.Alarm2Activity"
+            android:name="com.tencent.aiaudio.activity.TriggerAlarmActivity"
             android:launchMode="singleTask"
             android:screenOrientation="landscape"
             android:windowSoftInputMode="adjustPan|stateHidden" />
@@ -117,10 +112,6 @@
             android:windowSoftInputMode="adjustPan|stateHidden" />
         <activity
             android:name="com.tencent.aiaudio.activity.BinderActivity"
-            android:launchMode="singleTask"
-            android:screenOrientation="landscape" />
-        <activity
-            android:name="com.tencent.aiaudio.activity.ContactActivity"
             android:launchMode="singleTask"
             android:screenOrientation="landscape" />
 

@@ -43,14 +43,14 @@ typedef void (*TXCA_SET_ALARM_CALLBACK)(const char* voice_id, int err_code, unsi
  * @param voice_id 返回的请求id
  * @param optType 操作类型 1.增加 2.修改 3.删除 4.修改闹钟类型
  * @param alarm_info_json 操作对应的json结构
- * @param notify 结果返回
+ * @param cb 结果返回
  */
 SDK_API int txca_set_alarm_info(char* voice_id, int optType, const char* alarm_info_json, TXCA_SET_ALARM_CALLBACK cb);
 
 /**
- * 拉取定时Skill的播放资源
+ * 拉取定时Skill的播放资源/任务
  * @param voice_id 返回的请求id
- * @param clock_id 定时Skill任务的id
+ * @param alarm_id 定时Skill任务的id
  */
 SDK_API int txca_get_timing_skill_resources(char * voice_id, const char * alarm_id);
 

@@ -60,4 +60,9 @@ public class XWLoginStatusInfo {
     public String toString() {
         return JsonUtil.toJson(this);
     }
+
+    public String toCmdParams() {
+        return "{\"skill_id\":\"" + (skillId != null ? skillId : "") + "\",\"type\":" + type + ",\"app_id\":\"" + appID + "\",\"open_id\":\"" + openID + "\",\"access_token\":\"" + accessToken + "\",\"refresh_token\":\"" + (refreshToken != null ? refreshToken : "") + "\"}";
+    }
+
 }

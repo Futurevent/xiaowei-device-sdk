@@ -46,7 +46,7 @@ private:
 
     static bool OnAddAlbum(SESSION id, const txc_media_t *album, long index);
 
-    static bool OnPlaylistAddItem(SESSION id, const txc_media_t **list, bool isFront, long count);
+    static bool OnPlaylistAddItem(SESSION id, TXCA_PLAYLIST_TYPE resource_list_type, bool is_front, const txc_media_t **list, long count);
 
     static bool OnPlaylistUpdateItem(SESSION id, const txc_media_t **list, long count);
 
@@ -64,12 +64,7 @@ private:
 
     static bool OnXWMPlaylistAddItem(SESSION id, long begin_index, long count);
 
-    static void OnDownloadMsg(SESSION id, const txc_download_msg_data_t* data);
-
-    static void OnAudioMsgRecord(SESSION id);
-
-    static void OnAudioMsgSend(SESSION id, unsigned long long tinyId);
-
+    static void OnGetMoreList(SESSION id, XWM_GET_MORE_LIST_TYPE type, const char* play_id);
 private:
     static jclass s_class_MediaInfo;
     static jclass s_class_PlayState;

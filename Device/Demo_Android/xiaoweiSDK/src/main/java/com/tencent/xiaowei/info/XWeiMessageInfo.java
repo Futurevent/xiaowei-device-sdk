@@ -21,6 +21,9 @@ import android.os.Parcelable;
 
 import java.util.ArrayList;
 
+/**
+ * QQ消息
+ */
 public class XWeiMessageInfo implements Parcelable {
 
     /**

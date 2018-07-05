@@ -48,31 +48,31 @@ typedef struct _txca_param_response TXCA_PARAM_RESPONSE;
 //  所有数据的读取也在消息线程中，对外提供的API以assert保证
 class TXCMessageQueue
 {
-  public:
-    TXCMessageQueue();
-    ~TXCMessageQueue();
+public:
+  TXCMessageQueue();
+  ~TXCMessageQueue();
 
-    bool AddProcessor(txc_event_processor processor);
-    void RemoveProcessor(txc_event_processor processor);
+  bool AddProcessor(txc_event_processor processor);
+  void RemoveProcessor(txc_event_processor processor);
 
     //  async process at message thread
     void ProcessResponse(TXCA_PARAM_RESPONSE *response);
-    
-    void OnStartRequest(int errCode);
-    void OnSilence(int errCode);
-    void OnVoiceData(const char* data, int length);
 
-    bool PostMessage(SESSION id, XWM_EVENT event, XWPARAM arg1, XWPARAM arg2, unsigned int delay = 0);
-    bool SendMessage(SESSION id, XWM_EVENT event, XWPARAM arg1, XWPARAM arg2);
+  bool PostMessage(SESSION id, XWM_EVENT event, XWPARAM arg1, XWPARAM arg2, unsigned int delay = 0);
+  bool SendMessage(SESSION id, XWM_EVENT event, XWPARAM arg1, XWPARAM arg2);
 
-  protected:
-    void Start();
-    void Stop();
+protected:
+  void Start();
+  void Stop();
 
-  private:
-    friend class TXCServices;
+private:
+  friend class TXCServices;
 
-    inner::CMsgQueueImplAsyn *msg_queue_impl_;
+  inner::CMsgQueueImplAsyn *msg_queue_impl_;
 };
+
+bool post_message(SESSION id, XWM_EVENT event, XWPARAM arg1, XWPARAM arg2, unsigned int delay = 0);
+
+bool send_message(SESSION id, XWM_EVENT event, XWPARAM arg1, XWPARAM arg2);
 
 #endif /* TXCMessageQueue_hpp */

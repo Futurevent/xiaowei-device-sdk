@@ -35,7 +35,7 @@
 ### 目录结构说明
 
 - DeviceSDK：该目录包含小微通道层 SDK；
-- Device：里面包含控制层开源代码(CtrlModule)、Demo(Android、Linux、MacOs)以及部分功能协议的示例代码(Sample)。
+- Device：里面包含控制层开源代码(CtrlModule)、Demo(Android、Linux)以及部分功能协议的示例代码(Sample)。
 
 ### 接入指引
 
@@ -43,4 +43,4 @@
 
 ### 编译说明
 
-控制层的编译依赖一些第三方库，[了解详情](https://xiaowei.qcloud.com/wiki/#OpenSrc_SDK_Download)。
+控制层的编译依赖一些第三方库，[了解详情](https://xiaowei.qcloud.com/wiki/#OpenSrc_Control_Module)。

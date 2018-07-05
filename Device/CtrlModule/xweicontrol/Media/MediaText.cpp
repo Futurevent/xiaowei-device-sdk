@@ -48,7 +48,8 @@ void CMediaText::Init(const char *content, const char *description, unsigned int
 
 void CMediaText::Update(MEDIA_TYPE type)
 {
-    if (inited_) {
+    if (inited_)
+    {
         info_.type = type;
     }
 }

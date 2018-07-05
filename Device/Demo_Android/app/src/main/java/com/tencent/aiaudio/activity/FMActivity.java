@@ -17,7 +17,6 @@
 package com.tencent.aiaudio.activity;
 
 import com.tencent.xiaowei.def.XWCommonDef;
-import com.tencent.xiaowei.info.XWContextInfo;
 import com.tencent.xiaowei.sdk.XWSDK;
 
 public class FMActivity extends MusicActivity {
@@ -33,6 +32,6 @@ public class FMActivity extends MusicActivity {
     }
 
     protected void playFavorite() {
-        XWSDK.getInstance().request(XWCommonDef.RequestType.TEXT, "播放我收藏的故事".getBytes(), new XWContextInfo());
+        XWSDK.getInstance().request(XWCommonDef.RequestType.TEXT, "播放我收藏的故事".getBytes());
     }
 }

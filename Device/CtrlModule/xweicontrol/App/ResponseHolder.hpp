@@ -27,23 +27,23 @@ typedef struct _txca_param_resource TXCA_PARAM_RESOURCE;
 
 class CResponseHolder
 {
-  public:
-    //  swap data
-    void Swap(CResponseHolder &other);
+public:
+  //  swap data
+  void Swap(CResponseHolder &other);
 
-    void Copy(const TXCA_PARAM_RESPONSE *response);
+  void Copy(const TXCA_PARAM_RESPONSE *response);
 
-    TXCA_PARAM_RESPONSE &response();
+  TXCA_PARAM_RESPONSE &response();
 
-  private:
-    void Free();
+private:
+  void Free();
 
-    tpl::shared_ptr<TXCA_PARAM_RESPONSE> respex_;
+  tpl::shared_ptr<TXCA_PARAM_RESPONSE> respex_;
 
-    tpl::shared_ptr<CAutoBuffer<TXCA_PARAM_RES_GROUP> > resource_groups_;
-    typedef tpl::shared_ptr<CAutoBuffer<TXCA_PARAM_RESOURCE> > ResourcesPtr;
-    std::vector<ResourcesPtr> vec_resources_;
-    tpl::shared_ptr<CStringHolder> res_holder_;
+  tpl::shared_ptr<CAutoBuffer<TXCA_PARAM_RES_GROUP> > resource_groups_;
+  typedef tpl::shared_ptr<CAutoBuffer<TXCA_PARAM_RESOURCE> > ResourcesPtr;
+  std::vector<ResourcesPtr> vec_resources_;
+  tpl::shared_ptr<CStringHolder> res_holder_;
 };
 
 #endif /* RespnseHolder_hpp */

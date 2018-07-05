@@ -250,17 +250,9 @@ bool CXWeiPlayer::OnPushMusicMedia(const txc_media_t *media, bool needReleaseRes
     if (media->type == TYPE_TTS_OPUS)
     {
         CXWeiTTSManager::instance()->read(media->res_id, this);
-    } else if (media->type == TYPE_TTS_MSGPROMPT) {
-        unsigned long long timestamp = strtoull(media->description, NULL, 0);
-        unsigned long long uin = strtoull(media->content, NULL, 0);
-        char szVoiceId[100] = {0};
-        if (!txca_request_protocol_tts(szVoiceId, uin, timestamp, 403))
-        {
-            printf("OnPushMusicMedia txca_request_protocol_tts %s\n", szVoiceId);
-
-            CXWeiTTSManager::instance()->read(szVoiceId, this);
-        }
-    } else if (media->type == TYPE_TTS_TEXT || media->type == TYPE_TTS_TEXT_TIP) {
+    }
+    else if (media->type == TYPE_TTS_TEXT || media->type == TYPE_TTS_TEXT_TIP)
+    {
         TXCA_PARAM_CONTEXT context = {0};
         char szVoiceId[33] = {0};
         txca_request(szVoiceId, txca_chat_only_tts, media->content, strlen(media->content), &context);
@@ -268,19 +260,9 @@ bool CXWeiPlayer::OnPushMusicMedia(const txc_media_t *media, bool needReleaseRes
         printf("OnPushMusicMedia request tts %s", media->content);
 
         CXWeiTTSManager::instance()->read(szVoiceId, this);
-    } else if (player_ && media && media->description) {
-        // 获取资源meta信息
-        // using namespace rapidjson;
-        // Document json_doc;
-        // json_doc.Parse(media->description);
-        // const std::string &album = json_doc["album"].GetString();
-        // const std::string &artist = json_doc["artist"].GetString();
-        // const std::string &coverUrl = json_doc["cover"].GetString();
-        // const std::string &duration = json_doc["duration"].GetString();
-        // bool isFavorite = json_doc["favorite"].GetBool();
-        //
-        // const std::string &name = json_doc["name"].GetString();
-
+    }
+    else if (player_ && media)
+    {
         // 获取资源播放内容
         const char *url = media->content;
 
@@ -293,8 +275,10 @@ bool CXWeiPlayer::OnPushMusicMedia(const txc_media_t *media, bool needReleaseRes
 
 bool CXWeiPlayer::OnPlaylistAddItem(const txc_media_t **media_list, long count)
 {
-    if (media_list) {
-        for (long i = 0; i < count; ++i) {
+    if (media_list)
+    {
+        for (long i = 0; i < count; ++i)
+        {
             const txc_media_t *media = media_list[i];
             //   update ui
         }
@@ -303,7 +287,7 @@ bool CXWeiPlayer::OnPlaylistAddItem(const txc_media_t **media_list, long count)
 }
 
 CDecoderOpus::CDecoderOpus(size_t sample, size_t channel, size_t max_frames)
-    : sample_(sample), channel_(channel), max_frames_(max_frames), /*decoder_(NULL), opus_buffer_(NULL), */pcm_buffer_(NULL)
+    : sample_(sample), channel_(channel), max_frames_(max_frames), /*decoder_(NULL), opus_buffer_(NULL), */ pcm_buffer_(NULL)
 {
 }
 CDecoderOpus::~CDecoderOpus()

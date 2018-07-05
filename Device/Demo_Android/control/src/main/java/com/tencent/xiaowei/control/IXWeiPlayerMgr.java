@@ -86,7 +86,7 @@ public interface IXWeiPlayerMgr {
      * @param mediaInfoArray
      * @return
      */
-    boolean OnPlaylistAddItem(int sessionId, boolean isFront, XWeiMediaInfo[] mediaInfoArray);
+    boolean OnPlaylistAddItem(int sessionId, int resourceListType, boolean isFront, XWeiMediaInfo[] mediaInfoArray);
 
     /**
      * 需要更新列表元素
@@ -153,31 +153,9 @@ public interface IXWeiPlayerMgr {
     void onNeedReportPlayState(int sessionId, XWeiPlayState state);
 
     /**
-     * 通知下载消息文件
-     *
-     * @param sessionId
-     * @param tinyId
-     * @param channel
-     * @param type
-     * @param key1
-     * @param key2
-     * @param duration
-     */
-    void onDownloadMsgFile(int sessionId, long tinyId, int channel, int type, String key1,
-                           String key2, int duration, int timestamp);
-
-    /**
-     * 通知开始语音消息录音
+     * 获取历史列表
      *
      * @param sessionId
      */
-    void onAudioMsgRecord(int sessionId);
-
-    /**
-     * 通知发送语音消息
-     *
-     * @param sessionId
-     * @param tinyId
-     */
-    void onAudioMsgSend(int sessionId, long tinyId);
+    void onGetMoreList(int sessionId, int type, String playId);
 }

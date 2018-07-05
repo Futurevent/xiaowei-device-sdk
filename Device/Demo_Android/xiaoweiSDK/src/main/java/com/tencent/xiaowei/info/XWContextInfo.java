@@ -21,6 +21,8 @@ import android.os.Parcelable;
 
 import com.tencent.xiaowei.util.JsonUtil;
 
+import static com.tencent.xiaowei.def.XWCommonDef.WAKEUP_TYPE.WAKEUP_TYPE_DEFAULT;
+
 
 /**
  * 上下文信息
@@ -28,7 +30,7 @@ import com.tencent.xiaowei.util.JsonUtil;
 public class XWContextInfo implements Parcelable {
 
     /**
-     * 上下文ID
+     * 上下文，上一次的结果存在多轮对话时，需要为这个字段赋值
      */
     public String ID;
 
@@ -45,68 +47,52 @@ public class XWContextInfo implements Parcelable {
     /**
      * 声音请求的首包标志，首包时必须为true
      */
+    @Deprecated
     public boolean voiceRequestBegin;
 
     /**
      * 当使用外部VAD时，声音尾包置成true
      */
+    @Deprecated
     public boolean voiceRequestEnd;
 
     /**
-     * 识别引擎是用近场还是远场 {@link #PROFILE_TYPE_NEAR} or {@link #PROFILE_TYPE_FAR}
+     * 识别引擎是用近场还是远场 {@link com.tencent.xiaowei.def.XWCommonDef.PROFILE_TYPE}
      */
+    @Deprecated
     public int profileType;
-    /**
-     * 远场
-     */
-    public final static int PROFILE_TYPE_FAR = 0;
-    /**
-     * 近场
-     */
-    public final static int PROFILE_TYPE_NEAR = 1;
 
     /**
-     * 云端校验类请求生效{@link com.tencent.xiaowei.def.XWCommonDef.RequestType#WAKEUP_CHECK}
+     * 唤醒词类型：{@link com.tencent.xiaowei.def.XWCommonDef.WAKEUP_TYPE}，如果是{@link com.tencent.xiaowei.def.XWCommonDef.RequestType#WAKEUP_CHECK}的请求并且值为 {@link com.tencent.xiaowei.def.XWCommonDef.WAKEUP_TYPE#WAKEUP_TYPE_CLOUD_CHECK} 将进行云端校验。
      */
+    @Deprecated
     public int voiceWakeupType;
 
     /**
-     * 默认，纯本地唤醒或者按键唤醒
+     * 识别结果中去掉唤醒次，如果是{@link com.tencent.xiaowei.def.XWCommonDef.RequestType#VOICE}的请求并且{@link #voiceWakeupType}值为 {@link com.tencent.xiaowei.def.XWCommonDef.WAKEUP_TYPE#WAKEUP_TYPE_LOCAL_WITH_TEXT} 将进行该操作。
      */
-    public final static int WAKEUP_TYPE_DEFAULT = 0;
-    /**
-     * 需要云端校验唤醒词的请求
-     */
-    public final static int WAKEUP_TYPE_CLOUD_CHECK = 1;
-
-    /**
-     * 纯本地唤醒但是需要云端过滤掉唤醒词{@link #voiceWakeupText}
-     */
-    public final static int WAKEUP_TYPE_LOCAL_WITH_TEXT = 2;
-    /**
-     * 纯本地唤醒但是需要云端过滤掉的唤醒词，语音识别类请求生效{@link com.tencent.xiaowei.def.XWCommonDef.RequestType#VOICE}
-     */
+    @Deprecated
     public String voiceWakeupText;
 
-    public static final int REQUEST_PARAM_USE_LOCAL_VAD = 0x1;    //使用本地VAD
-    public static final int REQUEST_PARAM_GPS = 0x2;    //使用GPS位置
-    public static final int REQUEST_PARAM_USE_LOCAL_TTS = 0x4;    //使用本地TTS
-    public static final int REQUEST_PARAM_DUMP_SILK = 0x8;    //保存发出去的silk文件
-    public static final int REQUEST_PARAM_ONLY_VAD = 0x10;    //只做后台VAD
-
     /**
-     * 请求的一些参数
+     * 请求的一些参数{@link com.tencent.xiaowei.def.XWCommonDef.REQUEST_PARAM}
      */
+    @Deprecated
     public long requestParam;
 
     public XWContextInfo() {
+        speakTimeout = 5000;
+        silentTimeout = 500;
+    }
+
+    public void reset() {
         ID = null;
         speakTimeout = 5000;
         silentTimeout = 500;
         voiceRequestBegin = false;
         voiceRequestEnd = false;
+        voiceWakeupType = WAKEUP_TYPE_DEFAULT;
     }
-
 
     protected XWContextInfo(Parcel in) {
         ID = in.readString();
@@ -153,5 +139,25 @@ public class XWContextInfo implements Parcelable {
     @Override
     public String toString() {
         return JsonUtil.toJson(this);
+    }
+
+    public XWRequestInfo toRequestInfo() {
+        XWRequestInfo requestInfo = new XWRequestInfo();
+        requestInfo.contextId = ID;
+        requestInfo.profileType = profileType;
+        requestInfo.requestParam = requestParam;
+        requestInfo.silentTimeout = silentTimeout;
+        requestInfo.speakTimeout = speakTimeout;
+        requestInfo.voiceRequestBegin = voiceRequestBegin;
+        requestInfo.voiceRequestEnd = voiceRequestEnd;
+        requestInfo.voiceWakeupText = voiceWakeupText;
+        requestInfo.voiceWakeupType = voiceWakeupType;
+        return requestInfo;
+    }
+
+    public class CmdRsp {
+        public String id;
+        public int speak_timeout;
+        public int silent_timeout;
     }
 }

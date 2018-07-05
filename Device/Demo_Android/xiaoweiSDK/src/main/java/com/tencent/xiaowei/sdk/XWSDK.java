@@ -24,17 +24,19 @@ import android.text.TextUtils;
 import com.tencent.xiaowei.def.XWCommonDef;
 import com.tencent.xiaowei.info.XWAccountInfo;
 import com.tencent.xiaowei.info.XWAppInfo;
+import com.tencent.xiaowei.info.XWBinderInfo;
 import com.tencent.xiaowei.info.XWContextInfo;
 import com.tencent.xiaowei.info.XWEventLogInfo;
-import com.tencent.xiaowei.info.XWFileTransferInfo;
+import com.tencent.xiaowei.info.XWLoginInfo;
 import com.tencent.xiaowei.info.XWLoginStatusInfo;
 import com.tencent.xiaowei.info.XWPlayStateInfo;
+import com.tencent.xiaowei.info.XWRequestInfo;
 import com.tencent.xiaowei.info.XWResponseInfo;
 import com.tencent.xiaowei.info.XWTTSDataInfo;
-import com.tencent.xiaowei.info.XWeiMessageInfo;
 import com.tencent.xiaowei.util.QLog;
 import com.tencent.xiaowei.util.Singleton;
 
+import java.util.ArrayList;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -46,6 +48,7 @@ public class XWSDK {
     private ConcurrentHashMap<String, RequestListener> mMapRequestListener = new ConcurrentHashMap<>();
     private ConcurrentHashMap<String, GetAlarmListRspListener> mDeviceGetAlarmListListener = new ConcurrentHashMap<>();
     private ConcurrentHashMap<String, SetAlarmRspListener> mDeviceSetAlarmListener = new ConcurrentHashMap<>();
+    private ConcurrentHashMap<String, OnRspListener> mRspListenerMap = new ConcurrentHashMap<>();
     private OnSetWordsListListener mSetWordsListListener = null;
     static boolean online;
     private Context mContext;
@@ -56,14 +59,7 @@ public class XWSDK {
     private NetworkDelayListener mNetworkDelayListener;
     private OnReceiveTTSDataListener mOnReceiveTTSDataListener;
 
-    //response event enum
-    public final static int EVENT_IDLE = 0;          //空闲
-    public final static int EVENT_REQUEST_START = 1; //请求开始
-    public final static int EVENT_SPEAK = 2;         //检测到说话
-    public final static int EVENT_SILENT = 3;        //检测到静音
-    public final static int EVENT_RECOGNIZE = 4;     //识别到文本实时返回
-    public final static int EVENT_RESPONSE = 5;      //请求收到响应
-    public final static int EVENT_TTS = 6;           //小微后台推送的tts
+    XWLoginInfo mXWLoginInfo;
 
     private XWSDK() {
 
@@ -86,11 +82,12 @@ public class XWSDK {
     }
 
     /**
-     * 初始化语音服务
+     * 初始化语音服务 use {@link #login} instead.
      *
      * @param context     上下文对象，不能为null
      * @param accountInfo 账户信息，使用小微App对接传null即可
      */
+    @Deprecated
     public int init(Context context, XWAccountInfo accountInfo) {
         mContext = context.getApplicationContext();
         if (mainHandler == null) {
@@ -99,7 +96,9 @@ public class XWSDK {
         if (mUiThread == null) {
             mUiThread = context.getMainLooper().getThread();
         }
-        return XWSDKJNI.startXiaoweiService(accountInfo);
+        XWSDKJNI.startXiaoweiService();
+        XWSDKJNI.setXWAccountInfo(accountInfo);
+        return 0;
     }
 
     /**
@@ -110,22 +109,171 @@ public class XWSDK {
     }
 
     /**
+     * 登录小微服务，所有的服务都应该在登录后进行
+     *
+     * @param context   上下文对象
+     * @param loginInfo 登录信息
+     * @return 错误码
+     */
+    public void login(Context context, XWLoginInfo loginInfo, OnXWLoginListener listener) {
+        mContext = context.getApplicationContext();
+
+        if (listener == null) {
+            throw new RuntimeException("Init XWSDK failed,listener is null.");
+        }
+        // 先检查一遍loginInfo的基本格式
+        if (loginInfo == null) {
+            listener.onCheckParam(3, "loginInfo为空。");
+            return;
+        }
+        if (TextUtils.isEmpty(loginInfo.serialNumber) || loginInfo.serialNumber.length() != 16) {
+            listener.onCheckParam(3, "SN格式不正确，请传入符合规则的16位SN。");
+            return;
+        }
+        if (TextUtils.isEmpty(loginInfo.license) || TextUtils.isEmpty(loginInfo.srvPubKey) || loginInfo.productId == 0) {
+            listener.onCheckParam(3, "loginInfo参数非法。");
+            return;
+        }
+
+        if (mainHandler == null) {
+            mainHandler = new Handler(context.getMainLooper());
+        }
+        if (mUiThread == null) {
+            mUiThread = context.getMainLooper().getThread();
+        }
+
+        mXWLoginInfo = loginInfo;
+        QLog.init(context, context.getPackageName());
+        XWSDKJNI.getInstance().initJNI(5);// 控制打印native 的日志级别 取值[0-5],0表示关闭日志，1-5对应[e,w,i,d,v]。数字越大打印的日志级别越多。
+
+        /* err_failed                              = 0x00000001,       //failed 关键Service等对象不存在
+         * err_unknown                             = 0x00000002,       //未知错误
+         * err_invalid_param                       = 0x00000003,       //参数非法
+         * err_mem_alloc                           = 0x00000005,       //分配内存失败
+         * err_internal                            = 0x00000006,       //内部错误
+         * err_device_inited                       = 0x00000007,       //设备已经初始化过了
+         * err_invalid_device_info                 = 0x00000009,       //非法的设备信息
+         * err_invalid_serial_number               = 0x0000000A,       //(10)      非法的设备序列号
+         * err_invalid_system_path                 = 0x0000000E,       //(14)      非法的system_path
+         * err_invalid_app_path                    = 0x0000000F,       //(15)      非法的app_path
+         * err_invalid_temp_path                   = 0x00000010,       //(16)      非法的temp_path
+         * err_invalid_device_name                 = 0x00000015,       //(21)      设备名没填，或者长度超过32byte
+         * err_invalid_os_platform                 = 0x00000016,       //(22)      系统信息没填，或者长度超过32byte
+         * err_invalid_license                     = 0x00000017,       //(23)      license没填，或者长度超过150byte
+         * err_invalid_server_pub_key              = 0x00000018,       //(24)      server_pub_key没填，或者长度超过120byte
+         * err_invalid_product_version             = 0x00000019,       //(25)      product_version非法
+         * err_invalid_product_id                  = 0x0000001A,       //(26)      product_id非法
+         * err_sys_path_access_permission          = 0x0000001D,       //(29)      system_path没有读写权限
+         * err_invalid_network_type				= 0x0000001E,		//(30)		初始化时传入的网络类型非法
+         * err_invalid_run_mode					= 0x0000001F,		//(31)      初始化时传入的SDK运行模式非法
+         * 未找到设备信息，请确认设备是否开机或联网 34
+         * guid和licence不匹配 46
+         * licence长度超过255错误 57
+         * 公钥长度有问题 71
+         */
+        int ret = XWSDKJNI.getInstance().init(loginInfo.deviceName, loginInfo.license.getBytes(), loginInfo.serialNumber, loginInfo.srvPubKey, loginInfo.productId, loginInfo.productVersion, loginInfo.networkType, loginInfo.runMode,
+                loginInfo.sysPath, loginInfo.sysCapacity, loginInfo.appPath, loginInfo.appCapacity, loginInfo.tmpPath, loginInfo.tmpCapacity, 0);
+
+        if (ret == 0) {
+            int[] versions = XWSDKJNI.getInstance().getSDKVersion();
+            QLog.setBuildNumber(versions[0] + "." + versions[1] + "." + versions[2]);
+        } else {
+            listener.onCheckParam(ret, "");
+            return;
+        }
+        XWDeviceBaseManager.setOnXWLoginListener(listener);
+
+        XWSDKJNI.startXiaoweiService();
+        XWSDKJNI.initCCMsgModule();
+    }
+
+    /**
+     * 监听设备在线状态
+     *
+     * @param listener
+     */
+    public void setOnXWOnlineStatusListener(OnXWOnlineStatusListener listener) {
+        XWDeviceBaseManager.setOnXWOnlineStatusListener(listener);
+    }
+
+    /**
+     * 更新绑定者登录态
+     *
+     * @param accountInfo
+     */
+    public void setXWAccountInfo(XWAccountInfo accountInfo) {
+        XWSDKJNI.setXWAccountInfo(accountInfo);
+    }
+
+    /**
+     * 小微登录相关事件
+     */
+    public interface OnXWLoginListener {
+        /**
+         * 检查参数，这里会检测XWLoginInfo格式是否正确，如果出现错误码，后面就不会继续了，请自行检查参数
+         *
+         * @param errorCode
+         * @param info
+         */
+        void onCheckParam(int errorCode, String info);
+
+        /**
+         * 连接服务器
+         *
+         * @param errorCode 连接失败需要检查网络，以及是否屏蔽了腾讯的ip
+         */
+        void onConnectedServer(int errorCode);
+
+        /**
+         * 注册结果，pid+sn会换到设备唯一标识din，din很重要，反馈问题的时候都需要提供
+         *
+         * @param errorCode
+         * @param subCode
+         * @param din
+         */
+        void onRegister(int errorCode, int subCode, long din);
+
+        /**
+         * 登录结果
+         *
+         * @param errorCode
+         */
+        void onLogin(int errorCode, String erCodeUrl);
+
+        /**
+         * 登录后会收到绑定者列表，绑定者列表变化也会收到它
+         *
+         * @param errorCode
+         * @param arrayList
+         */
+        void onBinderListChange(int errorCode, ArrayList<XWBinderInfo> arrayList);
+    }
+
+    public interface OnXWOnlineStatusListener {
+        /**
+         * 上线，在登录成功和平时网络恢复会被调用。在线才能发出去请求
+         */
+        void onOnline();
+
+        /**
+         * 离线，断网后调用。
+         */
+        void onOffline();
+    }
+
+    /**
      * 设置语音请求状态回调接口
      */
     public void setAudioRequestListener(AudioRequestListener listener) {
         this.audioRequestListener = listener;
     }
 
-    /**
-     * 语音请求
-     *
-     * @param type        请求类型 {@link XWCommonDef.RequestType}
-     * @param requestData 请求数据
-     * @param context     上下文，用于携带额外的会话信息
-     * @return 本次请求对应的voiceID
-     */
-    public String request(int type, byte[] requestData, XWContextInfo context) {
-        String strVoiceID = XWSDKJNI.request(type, requestData, context);
+    public String request(int type, byte[] requestData) {
+        return request(type, requestData, (XWRequestInfo) null);
+    }
+
+    public String request(int type, byte[] requestData, XWRequestInfo param) {
+        String strVoiceID = XWSDKJNI.request(type, requestData, param);
         if (strVoiceID.isEmpty()) {
             QLog.e(TAG, "request voiceID is null.");
             return null;
@@ -134,28 +282,38 @@ public class XWSDK {
         return strVoiceID;
     }
 
+    /**
+     * 语音请求  use {@link #request} instead.
+     *
+     * @param type        请求类型 {@link XWCommonDef.RequestType}
+     * @param requestData 请求数据
+     * @param context     上下文，用于携带额外的会话信息
+     * @return 本次请求对应的voiceID
+     */
+    @Deprecated
+    public String request(int type, byte[] requestData, XWContextInfo context) {
+        return request(type, requestData, context.toRequestInfo());
+    }
+
 
     /**
      * 取消语音请求
      *
-     * @param voiceId 要取消的voiceID，当为0的时候，表示取消所有请求
+     * @param voiceId 要取消的voiceID，当为null的时候，表示取消所有请求
      */
     public int requestCancel(String voiceId) {
         return XWSDKJNI.cancelRequest(voiceId);
     }
 
-
     /**
      * 根据文本转TTS
      *
-     * @param strText     请求的文本
-     * @param contextInfo 上下文
-     * @param listener    回调监听
+     * @param strText  请求的文本
+     * @param listener 回调监听
      * @return 本次请求对应的VoiceID
      */
-    public String requestTTS(@NonNull byte[] strText, XWContextInfo contextInfo, RequestListener listener) {
-
-        String strVoiceID = XWSDKJNI.request(XWCommonDef.RequestType.ONLY_TTS, strText, contextInfo);
+    public String requestTTS(@NonNull byte[] strText, RequestListener listener) {
+        String strVoiceID = XWSDKJNI.request(XWCommonDef.RequestType.ONLY_TTS, strText, null);
 
         if (strVoiceID.isEmpty()) {
             QLog.e(TAG, "request voiceID is null.");
@@ -170,6 +328,19 @@ public class XWSDK {
     }
 
     /**
+     * 根据文本转TTS use {@link #requestTTS} instead.
+     *
+     * @param strText     请求的文本
+     * @param contextInfo 上下文
+     * @param listener    回调监听
+     * @return 本次请求对应的VoiceID
+     */
+    @Deprecated
+    public String requestTTS(@NonNull byte[] strText, XWContextInfo contextInfo, RequestListener listener) {
+        return requestTTS(strText, listener);
+    }
+
+    /**
      * 取消TTS的传输
      *
      * @param resId
@@ -179,7 +350,7 @@ public class XWSDK {
     }
 
     /**
-     * 拉取更多列表请求
+     * 拉取更多列表请求，建议使用{@link #request(String, String, String, OnRspListener)}获取结果
      * 在Response.hasMorePlaylist，且当前列表已经快播放完成或者用户滑动到底部时调用
      *
      * @param appInfo     场景信息，表示在哪个场景下，该接口暂时只支持音乐场景
@@ -205,7 +376,7 @@ public class XWSDK {
 
 
     /**
-     * 拉取播放资源详情
+     * 拉取播放资源详情，建议使用{@link #request(String, String, String, OnRspListener)}获取结果
      * 用于拉取歌词、是否收藏等信息时调用
      *
      * @param appInfo    场景信息，表示在哪个场景下，该接口暂时只支持音乐场景
@@ -228,7 +399,7 @@ public class XWSDK {
     }
 
     /**
-     * 更新播放列表url信息
+     * 更新播放列表url信息，建议使用{@link #request(String, String, String, OnRspListener)}获取结果
      *
      * @param appInfo    场景信息，表示在哪个场景下，该接口暂时只支持音乐场景
      * @param listPlayID 要拉取详情的playID
@@ -413,7 +584,7 @@ public class XWSDK {
 
 
     /**
-     * 获取提醒列表
+     * 获取提醒列表，建议使用{@link #request(String, String, String, OnRspListener)}获取结果
      *
      * @param listener 响应回调接口 定义请参考{@link XWSDK.GetAlarmListRspListener}
      * @return 接口调用结果，请参考{@link XWCommonDef.ErrorCode}
@@ -441,7 +612,7 @@ public class XWSDK {
      * @param strVoiceID     请求id
      * @param arrayAlarmList 提醒列表
      */
-    public void onGetAIAudioAlarmList(final int errCode, final String strVoiceID, final String[] arrayAlarmList) {
+    void onGetAIAudioAlarmList(final int errCode, final String strVoiceID, final String[] arrayAlarmList) {
 
         runOnMainThread(new Runnable() {
             @Override
@@ -455,7 +626,7 @@ public class XWSDK {
     }
 
     /**
-     * 设置闹钟或提醒
+     * 设置闹钟或提醒，建议使用{@link #request(String, String, String, OnRspListener)}获取结果
      *
      * @param opType       操作类型 1.增加 2.修改 3.删除 {@link XWCommonDef.AlarmOptType}
      * @param strAlarmJson 操作对应的json结构
@@ -479,7 +650,7 @@ public class XWSDK {
     }
 
     /**
-     * 拉取定时播放任务资源
+     * 拉取定时播放任务资源，建议使用{@link #request(String, String, String, OnRspListener)}获取结果
      *
      * @param strAlarmId 定时
      * @param listener   响应回调
@@ -514,7 +685,7 @@ public class XWSDK {
     }
 
     /**
-     * 设置主人登录态
+     * 设置主人登录态，建议使用{@link #request(String, String, String, OnRspListener)}
      *
      * @param info
      * @param listener
@@ -532,7 +703,7 @@ public class XWSDK {
     }
 
     /**
-     * 获取主人登录态
+     * 获取主人登录态，建议使用{@link #request(String, String, String, OnRspListener)}获取结果
      *
      * @param skillId
      * @param listener
@@ -550,10 +721,11 @@ public class XWSDK {
     }
 
     /**
-     * 获得音乐会员信息
+     * 获得音乐会员信息，建议使用{@link #request(String, String, String, OnRspListener)}获取结果
      *
      * @param listener
      */
+    @Deprecated
     public void getMusicVipInfo(RequestListener listener) {
         if (null == listener) {
             return;
@@ -581,15 +753,6 @@ public class XWSDK {
     }
 
     /**
-     * 初始化设置词表回调
-     *
-     * @param listener 回调
-     */
-    public void initSetWordsListListener(OnSetWordsListListener listener) {
-        mSetWordsListListener = listener;
-    }
-
-    /**
      * 开启可见可答
      *
      * @param enable true:open, false:close
@@ -600,7 +763,7 @@ public class XWSDK {
     }
 
     void onSetWordsListRet(int op, int errCode) {
-        QLog.e(TAG, "onSetWordsListRet op:" + op + " errCode:" + errCode);
+        QLog.v(TAG, "onSetWordsListRet op:" + op + " errCode:" + errCode);
         if (mSetWordsListListener != null) {
             mSetWordsListListener.OnReply(op, errCode);
         }
@@ -611,9 +774,11 @@ public class XWSDK {
      *
      * @param type       词库类型 {@link XWCommonDef.WordListType}
      * @param words_list 词库
+     * @param listener   回调
      * @return 0:success else failed
      */
-    public int setWordslist(int type, String[] words_list) {
+    public int setWordslist(int type, String[] words_list, OnSetWordsListListener listener) {
+        mSetWordsListListener = listener;
         return XWSDKJNI.setWordslist(type, words_list);
     }
 
@@ -624,7 +789,6 @@ public class XWSDK {
      * @param strVoiceID 请求id
      */
     void onSetAlarmCallback(final int errCode, final String strVoiceID, final int clockId) {
-
         runOnMainThread(new Runnable() {
             @Override
             public void run() {
@@ -656,7 +820,7 @@ public class XWSDK {
      *
      * @param tinyid    目标用户id，电话和消息需要填写
      * @param timestamp 时间 ,消息需要填，其余填0
-     * @param type      类别 {@link XWCommonDef.RequestProtocalType}
+     * @param type      类别 {@link XWCommonDef.RequestProtocolType}
      * @return TTS的resId
      */
     public String requestProtocolTTS(long tinyid, long timestamp, int type, RequestListener listener) {
@@ -666,86 +830,6 @@ public class XWSDK {
             mMapRequestListener.put(strVoiceID, listener);
         }
         return strVoiceID;
-    }
-
-    /**
-     * 文件传输的进度与结果
-     */
-    public interface OnFileTransferListener {
-        /**
-         * 文件传输的进度
-         *
-         * @param transferProgress
-         * @param maxTransferProgress
-         */
-        void onProgress(long transferProgress, long maxTransferProgress);
-
-        /**
-         * 文件传输的结果
-         *
-         * @param info
-         * @param errorCode
-         */
-        void onComplete(XWFileTransferInfo info, int errorCode);
-    }
-
-    public void downloadMiniFile(String fileKey, int fileType, String miniToken, OnFileTransferListener listener) {
-        XWSDKJNI.downloadMiniFile(fileKey, fileType, miniToken, listener);
-    }
-
-
-    /**
-     * 设置自动下载的回调通知
-     */
-    public interface OnAutoDownloadCallback {
-        /**
-         * 调用下载接口后，通知文件大小和使用的文件通道
-         *
-         * @param size      文件大小
-         * @param channel   文件通道
-         * @return          0:下载 非0:取消下载
-         */
-        int onDownloadFile(long size, int channel);
-    }
-
-    /**
-     * 设置是否自动下载的callback
-     * 可以在这里决定是否下载文件
-     *
-     * @param cb    回调
-     */
-    public void setAutoDownloadFileCallback(OnAutoDownloadCallback cb) {
-        XWFileTransferManager.setAutoDownloadCallback(cb);
-    }
-
-    /**
-     * 发送消息的进度和结果
-     */
-    public interface OnSendMessageListener {
-        /**
-         * 发送消息的进度
-         *
-         * @param transferProgress
-         * @param maxTransferProgress
-         */
-        void onProgress(long transferProgress, long maxTransferProgress);
-
-        /**
-         * 发送消息的结果
-         *
-         * @param errCode
-         */
-        void onComplete(int errCode);
-    }
-
-    /**
-     * 发送消息
-     *
-     * @param info 消息体
-     * @param listener 监听器
-     */
-    public void sendMessage(XWeiMessageInfo info, OnSendMessageListener listener) {
-        XWSDKJNI.sendMessage(info, listener);
     }
 
     /**
@@ -759,10 +843,45 @@ public class XWSDK {
 
     /**
      * 清除自定义设备状态, 与setUserState配合使用
-     *
      */
     public int clearUserState() {
         return XWSDKJNI.clearUserState();
+    }
+
+    /**
+     * 通用请求资源的回调
+     */
+    public interface OnRspListener {
+        /**
+         * @param voiceId 请求唯一标识
+         * @param error   错误码
+         * @param json    结果
+         */
+        void onRsp(String voiceId, int error, String json);
+    }
+
+    /**
+     * 通用请求资源的接口，参考{https://xiaowei.qcloud.com/wiki/#OpenSrc_Cmd_Interface}
+     *
+     * @param cmd      大命令
+     * @param subCmd   子命令
+     * @param params   参数
+     * @param listener {@link OnRspListener}
+     */
+    public String request(String cmd, String subCmd, String params, OnRspListener listener) {
+        String strVoiceID = XWSDKJNI.requestCmd(cmd, subCmd, params);
+        if (!strVoiceID.isEmpty() && listener != null) {
+            QLog.d(TAG, "request voiceId: " + strVoiceID);
+            mRspListenerMap.put(strVoiceID, listener);
+        }
+        return strVoiceID;
+    }
+
+    public void onRequest(String voiceId, int error, String json) {
+        OnRspListener listener = mRspListenerMap.get(voiceId);
+        if (listener != null) {
+            listener.onRsp(voiceId, error, json);
+        }
     }
 
 }

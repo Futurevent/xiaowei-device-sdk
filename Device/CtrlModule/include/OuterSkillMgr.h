@@ -18,6 +18,7 @@
 #define OuterSkillMgr_h
 
 #include "txctypedef.h"
+#include "AudioApp.h"
 
 typedef struct _txca_param_response TXCA_PARAM_RESPONSE;
 struct tcx_xwei_outer_skill_callback
@@ -26,6 +27,8 @@ struct tcx_xwei_outer_skill_callback
     bool (*start_outer_skill)(int session_id, const char *skill_name, const char *skill_id);
     // 回调cRsp，由外面进行处理，例如：闹钟skill
     bool (*send_txca_response)(int session_id, TXCA_PARAM_RESPONSE *cRsp);
+    // 内部的有些消息可能需要传给外部
+    bool (*on_message)(int session_id, XWM_EVENT event, XWPARAM arg1, XWPARAM arg2);
 };
 
 // 外部处理响应的回调

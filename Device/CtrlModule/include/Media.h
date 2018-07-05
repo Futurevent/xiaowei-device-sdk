@@ -30,7 +30,6 @@ enum MEDIA_TYPE
     TYPE_TTS_TEXT, // txc_media_t::description is the text
     TYPE_TTS_TEXT_TIP, // txc_media_t::description is the text
     TYPE_TTS_OPUS, // txc_media_t::description is the text
-    TYPE_TTS_MSGPROMPT, // txc_media_t::description is timestamp txc_media_t::content is tinyid
 
     TYPE_BEGIN_TEXT = 0x100,
     TYPE_URL,  // txc_media_t::description is the text
@@ -79,19 +78,6 @@ struct txc_progress_t
 
     long current_count;
     long total_count;
-};
-
-struct txc_download_msg_data_t
-{
-    unsigned long long tinyId;
-    unsigned int channel;
-    unsigned int type;
-    const char* key;
-    unsigned int key_length;
-    const char* mini_token;
-    unsigned int min_token_length;
-    unsigned int duration;
-    int timestamp;
 };
 
 CXX_EXTERN_END

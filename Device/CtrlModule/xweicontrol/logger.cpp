@@ -17,12 +17,13 @@
 #include "logger.h"
 #include "../library/log_c/src/log.h"
 #include "string.h"
+#include <string>
 
 #define _MAX_EVT_LEN 10240
 inline void TXCDefaultLog(int level, const char *module, int line, const char *text);
 custom_log_function g_custom_log = TXCDefaultLog;
 
-char *getLogText(const char *format, va_list args)
+std::string getLogText(const char *format, va_list args)
 {
     char msg[_MAX_EVT_LEN + 7] = {0}; /*5bytes for '...' and '\r\n'*/
 
@@ -49,8 +50,8 @@ char *getLogText(const char *format, va_list args)
         len += _r;
     }
     msg[len] = 0;
-    char *str = msg;
-    return str;
+    
+    return std::string(msg);
 }
 
 void TXCLog(int level, const char *file, int line, const char *fmt, ...)
@@ -70,7 +71,7 @@ void TXCLog(int level, const char *file, int line, const char *fmt, ...)
         va_start(ap, fmt);
         if (g_custom_log)
         {
-            g_custom_log(level, file, line, getLogText(fmt, ap));
+            g_custom_log(level, file, line, getLogText(fmt, ap).c_str());
         }
         va_end(ap);
     }

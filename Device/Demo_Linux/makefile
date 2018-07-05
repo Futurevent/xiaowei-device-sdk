@@ -13,6 +13,7 @@ CROSS   :=
 INCLUDE += -I./
 INCLUDE += -I../../DeviceSDK/interface/linux
 INCLUDE += -I../CtrlModule/include
+INCLUDE += -I../CtrlModule/library/rapidjson-1.1.0/include/rapidjson
 
 #需要引用的库
 LIB     += -ldl 

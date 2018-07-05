@@ -18,26 +18,26 @@
 #define _AIAUDIO_TXCServices_HPP_
 
 #include "Player.h"
-#include "AudioApp.hpp"
 #include "TXCAppManager.hpp"
+#include "MediaCenter.hpp"
 #include "TXCMessageQueue.hpp"
 #include "AudioFocusManager.hpp"
 
 template <typename T>
 class Singleton
 {
-  public:
-    static T *instance()
+public:
+  static T *instance()
+  {
+    if (!instance_)
     {
-        if (!instance_)
-        {
-            instance_ = new T;
-        }
-        return instance_;
+      instance_ = new T;
     }
+    return instance_;
+  }
 
-  private:
-    static T *instance_;
+private:
+  static T *instance_;
 };
 template <typename T>
 T *Singleton<T>::instance_ = NULL;
@@ -45,26 +45,24 @@ T *Singleton<T>::instance_ = NULL;
 class TXCServices
     : public Singleton<TXCServices>
 {
-  public:
-    TXCAudioService *GetAudioService();
-    TXCAppManager *GetAppManager();
-    TXCMessageQueue *GetMessageQueue();
-    TXCMediaCenter *GetMediaCenter();
-    TXCPlayerManager *GetPlayerManager();
-    TXCAudioFocusManager *GetAudioFocusManager();
+public:
+  TXCAppManager *GetAppManager();
+  TXCMessageQueue *GetMessageQueue();
+  TXCMediaCenter *GetMediaCenter();
+  TXCPlayerManager *GetPlayerManager();
+  TXCAudioFocusManager *GetAudioFocusManager();
 
-  private:
-    friend class Singleton<TXCServices>;
-    TXCServices();
-    ~TXCServices();
+private:
+  friend class Singleton<TXCServices>;
+  TXCServices();
+  ~TXCServices();
 
-  private:
-    TXCAudioService *audio_service_;
-    TXCAppManager *app_manager_;
-    TXCMessageQueue *message_queue_;
-    TXCMediaCenter *media_center_;
-    TXCPlayerManager *player_manager_;
-    TXCAudioFocusManager *audio_focus_manager_;
+private:
+  TXCAppManager *app_manager_;
+  TXCMessageQueue *message_queue_;
+  TXCMediaCenter *media_center_;
+  TXCPlayerManager *player_manager_;
+  TXCAudioFocusManager *audio_focus_manager_;
 };
 
 #endif /* _AIAUDIO_TXCServices_HPP_ */

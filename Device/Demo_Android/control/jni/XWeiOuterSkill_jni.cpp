@@ -83,8 +83,6 @@ bool send_txca_response(int sessionId, TXCA_PARAM_RESPONSE *pRsp) {
                                             "Lcom/tencent/xiaowei/info/XWContextInfo;");
     jfieldID jfRequestText = env->GetFieldID(s_class_Response, "requestText",
                                               "Ljava/lang/String;");
-    jfieldID jfResponseType = env->GetFieldID(s_class_Response,
-                                               "responseType", "I");
     jfieldID jfResponseData = env->GetFieldID(s_class_Response,
                                                "responseData",
                                                "Ljava/lang/String;");
@@ -96,10 +94,15 @@ bool send_txca_response(int sessionId, TXCA_PARAM_RESPONSE *pRsp) {
     jfieldID jfResources = env->GetFieldID(s_class_ResGroup, "resources", "[Lcom/tencent/xiaowei/info/XWResourceInfo;");
     jfieldID jfHasMorePlaylist = env->GetFieldID(s_class_Response,
                                                   "hasMorePlaylist", "Z");
+    jfieldID jfHasHistoryPlaylist = env->GetFieldID(s_class_Response,
+                                                  "hasHistoryPlaylist", "Z");
+
     jfieldID jfRecoveryAble = env->GetFieldID(s_class_Response, "recoveryAble",
                                              "Z");
     jfieldID jfPlayBehavior = env->GetFieldID(s_class_Response,
                                                "playBehavior", "I");
+    jfieldID jfResourceListType = env->GetFieldID(s_class_Response,
+                                               "resourceListType", "I");
     jfieldID jfIsNotify = env->GetFieldID(s_class_Response, "isNotify",
                                              "Z");
 
@@ -115,12 +118,6 @@ bool send_txca_response(int sessionId, TXCA_PARAM_RESPONSE *pRsp) {
                                                   "speakTimeout", "I");
     jfieldID jfSilentTimeout = env->GetFieldID(s_class_ContextInfo,
                                                    "silentTimeout", "I");
-    jfieldID jfVoiceReqBegin = env->GetFieldID(s_class_ContextInfo,
-                                                   "voiceRequestBegin", "Z");
-    jfieldID jfVoiceReqEnd = env->GetFieldID(s_class_ContextInfo,
-                                                 "voiceRequestEnd", "Z");
-    jfieldID jfProfileType = env->GetFieldID(s_class_ContextInfo,
-                                                 "profileType", "I");
 
     jfieldID jfResFormat = env->GetFieldID(s_class_Resource, "format", "I");
     jfieldID jfResOffset = env->GetFieldID(s_class_Resource, "offset", "I");
@@ -193,12 +190,6 @@ bool send_txca_response(int sessionId, TXCA_PARAM_RESPONSE *pRsp) {
                      (jint) pRsp->context.speak_timeout);
     env->SetIntField(objContext, jfSilentTimeout,
                      (jint) pRsp->context.silent_timeout);
-    env->SetBooleanField(objContext, jfVoiceReqBegin,
-                         (jboolean) pRsp->context.voice_request_begin);
-    env->SetBooleanField(objContext, jfVoiceReqEnd,
-                         (jboolean) pRsp->context.voice_request_end);
-    env->SetIntField(objContext, jfProfileType,
-                     (jint) pRsp->context.wakeup_profile);
 
     env->SetObjectField(objRsp, jfContext, objContext);
     env->DeleteLocalRef(strCtxID);
@@ -210,20 +201,11 @@ bool send_txca_response(int sessionId, TXCA_PARAM_RESPONSE *pRsp) {
     env->SetObjectField(objRsp, jfRequestText, strRequestText);
     env->DeleteLocalRef(strRequestText);
 
-    //response_type
-    env->SetIntField(objRsp, jfResponseType, pRsp->response_type);
-
     //response_data
     jstring strRspExtend;
     ConvChar2JString(env, pRsp->response_data, strRspExtend);
     env->SetObjectField(objRsp, jfResponseData, strRspExtend);
     env->DeleteLocalRef(strRspExtend);
-
-    //auto_test_data
-    jstring strTestExtend;
-    ConvChar2JString(env, pRsp->auto_test_data, strTestExtend);
-    env->SetObjectField(objRsp, jfAutoTestData, strTestExtend);
-    env->DeleteLocalRef(strTestExtend);
 
     jmethodID initResGroup = env->GetMethodID(s_class_ResGroup, "<init>",
                                               "()V");
@@ -274,12 +256,17 @@ bool send_txca_response(int sessionId, TXCA_PARAM_RESPONSE *pRsp) {
     env->SetBooleanField(objRsp, jfHasMorePlaylist,
                          (jboolean) pRsp->has_more_playlist);
 
+    env->SetBooleanField(objRsp, jfHasHistoryPlaylist,
+                         (jboolean) pRsp->has_history_playlist);
+
     //is_recovery
     env->SetBooleanField(objRsp, jfRecoveryAble, (jboolean) pRsp->is_recovery);
     env->SetBooleanField(objRsp, jfIsNotify, (jboolean) pRsp->is_notify);
 
     //play_behavior
     env->SetIntField(objRsp, jfPlayBehavior, pRsp->play_behavior);
+
+    env->SetIntField(objRsp, jfResourceListType, pRsp->resource_list_type);
 
     bHandled = env->CallBooleanMethod(s_obj_XWeiOuterSkill, onSendResponse, sessionId, objRsp);
 

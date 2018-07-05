@@ -22,21 +22,21 @@
 // url类型的Media
 class CMediaMusic : public CMedia
 {
-  public:
-    void Init(const char *content, const char *mediaInfo, unsigned long long offset, unsigned int play_count);
-    void Update(const char *content, const char *mediaInfo, unsigned long long offset);
-    void Update(MEDIA_TYPE type);
+public:
+  void Init(const char *content, const char *mediaInfo, unsigned long long offset, unsigned int play_count, int belong_list_type = 0);
+  void Update(const char *content, const char *mediaInfo, unsigned long long offset);
+  void Update(MEDIA_TYPE type);
 
-    //  见 txc_media_read() 声明
-    virtual int Read(_Out_ const void **data, _Out_ size_t *data_size, _In_ size_t offset);
+  //  见 txc_media_read() 声明
+  virtual int Read(_Out_ const void **data, _Out_ size_t *data_size, _In_ size_t offset);
 
-  private:
-    friend class TXCMediaCenter;
+private:
+  friend class TXCMediaCenter;
 
-    CMediaMusic(const std::string &res_id);
+  CMediaMusic(const std::string &res_id);
 
-  private:
-    bool inited_;
+private:
+  bool inited_;
 };
 
 #endif /* MediaMusic_hpp */

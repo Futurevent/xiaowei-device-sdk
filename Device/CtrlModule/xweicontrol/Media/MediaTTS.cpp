@@ -29,12 +29,7 @@ CMediaTTS::CMediaTTS(const std::string &res_id)
     info_.res_id = res_id_.c_str();
     info_.type = TYPE_TTS_OPUS;
 
-    sample_ = 0;
-    channel_ = 0;
-    pcm_sample_ = 0;
-
     inited_ = false;
-    completed_ = false;
 }
 
 void CMediaTTS::Init(const char *content, unsigned int play_count)
@@ -48,11 +43,6 @@ void CMediaTTS::Init(const char *content, unsigned int play_count)
         info_.play_count = play_count_;
         inited_ = true;
     }
-}
-
-void CMediaTTS::SetComplete()
-{
-    completed_ = true;
 }
 
 int CMediaTTS::Read(_Out_ const void **data, _Out_ size_t *data_size, _In_ size_t offset)

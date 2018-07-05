@@ -21,7 +21,7 @@
 
 CXX_EXTERN_BEGIN
 
-// 播放器控制回调事件
+// Skill控制回调应用层的动作
 enum TXC_PLAYER_ACTION
 {
     ACT_NULL = 0,
@@ -31,19 +31,20 @@ enum TXC_PLAYER_ACTION
     ACT_PLAYLIST_ADD_ITEM_FRONT, // add front,media_list = (const txc_media_t **)arg1; count = (long)arg2
     ACT_PLAYLIST_REMOVE_ITEM, // media = (const txc_media_t *)arg1; index = (long)arg2
     ACT_PLAYLIST_UPDATE_ITEM, // media_list = (const txc_media_t **)arg1; count = (long)arg2
+    ACT_PLAYLIST_HISTORY_ADD_ITEM, // add to history list back,media_list = (const txc_media_t **)arg1; count = (long)arg2
+    ACT_PLAYLIST_HISTORY_ADD_ITEM_FRONT, // add to history list front,media_list = (const txc_media_t **)arg1; count = (long)arg2
     ACT_PLAYER_STOP,
     ACT_PLAYER_PAUSE, //  pause = bool(arg1)
     ACT_PLAYER_SET_REPEAT_MODE,
     ACT_PLAYER_FINISH,
+    ACT_PLAYER_SEEK_TO,
     ACT_RESPONSE_DATA, //  data_type = reinterpret_cast<unsigned int>(arg1); response_json = reinterpret_cast<const char *>(arg2)
     ACT_PROGRESS, //  progress = reinterpret_cast<const txc_progress_t *>(arg1);
     ACT_NEED_SUPPLEMENT, // timeout = reinterpret_cast<long>(arg1); response = reinterpret_cast<const TXCA_PARAM_RESPONSE*>(arg2)
     ACT_NEED_TIPS, // need tips, type = reinterpret_cast<int>(arg1);
     ACT_CHANGE_VOLUME, // volume = reinterpret_cast<int>(arg1); arg1%
     ACT_REPORT_PLAY_STATE, // report playstate
-    ACT_DOWNLOAD_MSG,      // data_type = reinterpret_cast<txc_download_data_t>(arg1);
-    ACT_AUDIOMSG_RECORD,    //
-    ACT_AUDIOMSG_SEND,      //
+    ACT_NEED_GET_MORE_LIST,// get history list or get next/front list  arg1:XWM_GET_MORE_LIST_TYPE arg2:resid
 };
 
 // 播放器状态定义，参考接口txc_player_statechange中的说明
@@ -71,7 +72,7 @@ typedef enum player_control {
     PLAYER_CONTROL_NULL = 0,
     PLAYER_BEGIN_PLAYER_CONTROL = 1,
     PLAYER_STOP,
-    PLAYER_PLAY,    //  arg1: index
+    PLAYER_PLAY,    //  arg1: index  arg2: list_type
     PLAYER_PAUSE,   //
     PLAYER_RESUME,  //
     PLAYER_VOLUME,  //  arg1: value of volume
@@ -122,11 +123,10 @@ typedef enum player_status {
 // 控制层播放器信息定义
 typedef struct txc_player_info_t
 {
-    PLAYER_STATUS status;      // 播放器内部状态
-    REPEAT_MODE repeatMode;    // 播放器播放模式定义
-    int playlist_id;           // 播放列表id
-    int volume;                // 音量
-    int qulity;                // 品质值
+    PLAYER_STATUS status; // 播放器内部状态
+    REPEAT_MODE repeatMode; // 播放器播放模式定义
+    SESSION session; // 播放列表id
+    int volume;
 } txc_player_info_t;
 
 /**

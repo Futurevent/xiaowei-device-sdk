@@ -6,6 +6,7 @@ COMMON_INCLUDE:= \
 	-I$(DIR_PROJ_ROOT)/xweicontrol \
 	-I$(DIR_PROJ_ROOT)/xweicontrol/App \
 	-I$(DIR_PROJ_ROOT)/xweicontrol/Media \
+	-I$(DIR_PROJ_ROOT)/xweicontrol/Control \
 	-I$(DIR_PROJ_ROOT)/xweicontrol/TXCModules \
 	-I$(DIR_PROJ_ROOT)/library/rapidjson-1.1.0/include/rapidjson \
 	-I$(DIR_PROJ_ROOT)/library/opus-1.2.1/include \

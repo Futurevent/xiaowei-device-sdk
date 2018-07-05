@@ -19,7 +19,9 @@ package com.tencent.xiaowei.info;
 import android.os.Parcel;
 import android.os.Parcelable;
 
-
+/**
+ * 绑定者的小微备注
+ */
 public class XWBinderRemark implements Parcelable {
     public String remark;
     public long tinyid;

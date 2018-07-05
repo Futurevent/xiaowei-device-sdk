@@ -49,13 +49,6 @@ public class XWMediaType {
     public final static int TYPE_TTS_OPUS = 4;
 
     /**
-     * 消息前缀tts的请求数据
-     * description: 时间戳
-     * content: tinyid
-     */
-    public final static int TYPE_TTS_MSGPROMPT = 5;
-
-    /**
      * 文本类资源起始定义，未使用
      */
     public final static int TYPE_BEGIN_TEXT = 0x100;

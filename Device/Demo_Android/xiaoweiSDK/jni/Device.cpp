@@ -77,9 +77,9 @@ void on_connected_server(int error_code)
  * @param error_code 错误码 0 注册成功，1 信息不对， 2 未知错误
  * @param sub_error_code 子错误码
  */
-void on_register(int error_code, int sub_error_code)
+void on_register(int error_code, int sub_error_code, unsigned long long din)
 {
-    __android_log_print(ANDROID_LOG_DEBUG, LOGFILTER, "on_register: error_code %d sub_error_code: %d", error_code, sub_error_code);
+    __android_log_print(ANDROID_LOG_DEBUG, LOGFILTER, "on_register: error_code %d sub_error_code: %d din:%llu", error_code, sub_error_code, din);
     bool needRelease = false;
     JNIEnv *env = Util_CreateEnv(&needRelease);
     if (!env) {
@@ -88,10 +88,10 @@ void on_register(int error_code, int sub_error_code)
 
     jclass cls = env->GetObjectClass(tx_service);
     jmethodID methodID = env->GetMethodID(cls, "onRegisterResult",
-                                          "(II)V");
+                                          "(IIJ)V");
     if (methodID)
     {
-        env->CallVoidMethod(tx_service, methodID, error_code, sub_error_code);
+        env->CallVoidMethod(tx_service, methodID, error_code, sub_error_code, din);
     }
 
     env->DeleteLocalRef(cls);

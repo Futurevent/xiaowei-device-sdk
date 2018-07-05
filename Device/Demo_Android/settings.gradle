@@ -1,1 +1,1 @@
-include ':app',':control',':wakeup',':xiaoweiSDK','amr'
+include ':app',':control',':wakeup',':xiaoweiSDK'

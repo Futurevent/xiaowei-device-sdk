@@ -16,9 +16,11 @@
  */
 package com.tencent.xiaowei.control;
 
+import android.content.Context;
 import android.media.AudioManager;
 import android.os.Handler;
 import android.os.HandlerThread;
+import android.support.annotation.NonNull;
 
 import com.tencent.xiaowei.util.QLog;
 import com.tencent.xiaowei.util.Singleton;
@@ -26,7 +28,7 @@ import com.tencent.xiaowei.util.Singleton;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * 声音焦点管理
+ * 声音焦点管理，常量定义参照说明，为了适应小微的业务逻辑，可能部分逻辑与Android系统不一致。
  */
 public class XWeiAudioFocusManager {
 
@@ -61,7 +63,22 @@ public class XWeiAudioFocusManager {
      * 收到后应该降低音量播放
      */
     public static final int AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK = -3;
+
+
     private static final String TAG = "XWeiAudioFocusManager";
+
+    // 使用内部焦点管理
+    private int mFocusChange;
+    private ConcurrentHashMap<OnAudioFocusChangeListener, Integer> map = new ConcurrentHashMap<>();
+    private ConcurrentHashMap<Integer, OnAudioFocusChangeListener> i2lMap = new ConcurrentHashMap<>();
+    private ConcurrentHashMap<Integer, Integer> cookieMap = new ConcurrentHashMap<>();
+    private Handler mHandler;
+
+
+    // 使用Android焦点管理
+    private Context mContext;
+    private AudioManager mAudioManager;
+    private ConcurrentHashMap<Integer, FocusItem> mCookieLisetener = new ConcurrentHashMap<>();
 
     private static Singleton<XWeiAudioFocusManager> sSingleton = new Singleton<XWeiAudioFocusManager>() {
         @Override
@@ -69,14 +86,6 @@ public class XWeiAudioFocusManager {
             return new XWeiAudioFocusManager();
         }
     };
-    private int mFocusChange;
-
-    private ConcurrentHashMap<OnAudioFocusChangeListener, Integer> map = new ConcurrentHashMap<>();
-    private ConcurrentHashMap<Integer, OnAudioFocusChangeListener> i2lMap = new ConcurrentHashMap<>();
-    private ConcurrentHashMap<Integer, Integer> cookieMap = new ConcurrentHashMap<>();
-
-    private Handler mHandler;
-
 
     public static XWeiAudioFocusManager getInstance() {
         if (sSingleton == null) {
@@ -90,12 +99,101 @@ public class XWeiAudioFocusManager {
         return sSingleton.getInstance();
     }
 
+    public void init(Context context) {
+        mContext = context.getApplicationContext();
+        mAudioManager = (AudioManager) mContext.getSystemService(Context.AUDIO_SERVICE);
+    }
+
     private XWeiAudioFocusManager() {
         HandlerThread handlerThread = new HandlerThread(TAG);
         handlerThread.start();
         mHandler = new Handler(handlerThread.getLooper());
     }
 
+    int onRequestAudioFocus(final int cookie, int duration) {
+        QLog.e(TAG, "onRequestAudioFocus " + cookie + " duration:" + duration);
+        if (mContext == null) {
+            return AudioManager.AUDIOFOCUS_REQUEST_FAILED;
+        }
+        FocusItem focusItem = mCookieLisetener.get(cookie);
+        if (focusItem == null) {
+            focusItem = new FocusItem();
+            focusItem.hint = duration;
+            final FocusItem finalFocusItem = focusItem;
+            focusItem.listener = new AudioManager.OnAudioFocusChangeListener() {
+                @Override
+                public void onAudioFocusChange(int focusChange) {
+                    QLog.e(TAG, "onAudioFocusChange " + cookie + " focusChange:" + focusChange);
+
+                    // XW的焦点中，非AUDIOFOCUS_GAIN，不接受AUDIOFOCUS_LOSS_TRANSIENT，直接替换成AUDIOFOCUS_LOSS
+                    if (finalFocusItem.hint != AudioManager.AUDIOFOCUS_GAIN && focusChange == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT) {
+                        focusChange = AUDIOFOCUS_LOSS;
+                    }
+                    // XW的焦点中，AUDIOFOCUS_GAIN，不接受非自己释放的AUDIOFOCUS_LOSS，直接替换成AUDIOFOCUS_LOSS_TRANSIENT
+                    if (finalFocusItem.hint == AudioManager.AUDIOFOCUS_GAIN && focusChange == AudioManager.AUDIOFOCUS_LOSS) {
+                        focusChange = AUDIOFOCUS_LOSS_TRANSIENT;
+                    }
+                    if (focusChange == AUDIOFOCUS_LOSS) {
+                        onAbandonAudioFocus(cookie);
+                    }
+                    XWeiControl.getInstance().nativeSetAudioFocusChange(cookie, focusChange);
+                }
+            };
+            mCookieLisetener.put(cookie, focusItem);
+        }
+        return mAudioManager.requestAudioFocus(focusItem.listener, AudioManager.STREAM_MUSIC, duration);
+    }
+
+    int onAbandonAudioFocus(int cookie) {
+        QLog.e(TAG, "onAbandonAudioFocus " + cookie);
+        if (mContext == null) {
+            return AudioManager.AUDIOFOCUS_REQUEST_FAILED;
+        }
+        if (cookie == -1) {
+            return abandonAllListener();
+        }
+        FocusItem focusItem = mCookieLisetener.get(cookie);
+        if (focusItem != null) {
+            int ret = mAudioManager.abandonAudioFocus(focusItem.listener);
+            mCookieLisetener.remove(cookie);
+            return ret;
+        }
+        return AudioManager.AUDIOFOCUS_REQUEST_GRANTED;
+    }
+
+    /**
+     * 释放所有焦点，会停止所有的播放资源，适合在解绑的时候使用
+     */
+    public void abandonAllAudioFocus() {
+        mHandler.post(new Runnable() {
+            @Override
+            public void run() {
+                XWeiControl.getInstance().nativeAbandonAllAudioFocus();
+            }
+        });
+    }
+
+    private int abandonAllListener() {
+        for (FocusItem focusItem : mCookieLisetener.values()) {
+            mAudioManager.abandonAudioFocus(focusItem.listener);
+        }
+        mCookieLisetener.clear();
+
+        return AudioManager.AUDIOFOCUS_REQUEST_GRANTED;
+    }
+
+    public AudioManager getAudioManager() {
+        return mAudioManager;
+    }
+
+    static class FocusItem {
+        @NonNull
+        public AudioManager.OnAudioFocusChangeListener listener;
+        public int hint;
+    }
+
+    // ************下面是使用内部焦点管理的逻辑
+    @Deprecated
     public boolean needRequestFocus(int duration) {
         if (duration < AUDIOFOCUS_GAIN || duration > AUDIOFOCUS_GAIN_TRANSIENT_EXCLUSIVE) {
             return false;
@@ -109,6 +207,7 @@ public class XWeiAudioFocusManager {
         return false;
     }
 
+    @Deprecated
     public interface OnAudioFocusChangeListener {
         void onAudioFocusChange(int focusChange);
     }
@@ -119,6 +218,7 @@ public class XWeiAudioFocusManager {
      * @param listener
      * @param duration
      */
+    @Deprecated
     public void requestAudioFocus(final OnAudioFocusChangeListener listener, final int duration) {
         if (duration < AUDIOFOCUS_GAIN || duration > AUDIOFOCUS_GAIN_TRANSIENT_EXCLUSIVE || listener == null) {
             return;
@@ -141,6 +241,7 @@ public class XWeiAudioFocusManager {
         });
     }
 
+    @Deprecated
     void onFocusChange(final int cookie, final int duration) {
         mHandler.post(new Runnable() {
             @Override
@@ -166,6 +267,7 @@ public class XWeiAudioFocusManager {
      *
      * @param listener
      */
+    @Deprecated
     public void abandonAudioFocus(final OnAudioFocusChangeListener listener) {
         abandonAudioFocus(listener, 0);
     }
@@ -176,6 +278,7 @@ public class XWeiAudioFocusManager {
      * @param listener
      * @param delayMillis
      */
+    @Deprecated
     public void abandonAudioFocus(final OnAudioFocusChangeListener listener, int delayMillis) {
         if (listener == null) {
             return;
@@ -191,23 +294,13 @@ public class XWeiAudioFocusManager {
         }, delayMillis);
     }
 
-    /**
-     * 释放所有焦点，会停止所有的播放资源，适合在解绑的时候使用
-     */
-    public void abandonAllAudioFocus() {
-        mHandler.post(new Runnable() {
-            @Override
-            public void run() {
-                XWeiControl.getInstance().nativeAbandonAllAudioFocus();
-            }
-        });
-    }
 
     /**
      * 设置当前App获得的焦点，Android向系统申请焦点的时候会获得对应的focusChange，通知播放控制焦点管理器进行管理。
      *
      * @param focusChange 可以是{@link AudioManager#AUDIOFOCUS_GAIN}、{@link AudioManager#AUDIOFOCUS_LOSS}、{@link AudioManager#AUDIOFOCUS_LOSS_TRANSIENT}、{@link AudioManager#AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK}
      */
+    @Deprecated
     public void setAudioFocusChange(final int focusChange) {
         mHandler.post(new Runnable() {
             @Override
@@ -218,5 +311,4 @@ public class XWeiAudioFocusManager {
             }
         });
     }
-
 }

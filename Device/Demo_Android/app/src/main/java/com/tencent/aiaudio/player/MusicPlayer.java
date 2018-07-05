@@ -34,6 +34,8 @@ public class MusicPlayer extends BasePlayer {
     private static final int STATE_RELEASED = 5;
 
     private int state = STATE_INIT;
+    private float mLeftVolume = -1;
+    private float mRightVolume = -1;
 
 
     public MusicPlayer() {
@@ -56,6 +58,9 @@ public class MusicPlayer extends BasePlayer {
             public void onPrepared(MediaPlayer mp) {
                 state = STATE_PREPARED;
                 notifyOnPrepared();
+                if (mLeftVolume >= 0 && mRightVolume >= 0) {
+                    mMediaPlayer.setVolume(mLeftVolume, mRightVolume);
+                }
             }
         });
         mMediaPlayer.setOnErrorListener(new MediaPlayer.OnErrorListener() {
@@ -187,7 +192,12 @@ public class MusicPlayer extends BasePlayer {
             try {
                 mMediaPlayer.setVolume(left, right);
             } catch (Exception e) {
+                mLeftVolume = left;
+                mRightVolume = right;
             }
+        } else {
+            mLeftVolume = left;
+            mRightVolume = right;
         }
     }
 

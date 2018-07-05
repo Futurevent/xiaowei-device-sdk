@@ -15,6 +15,7 @@
  *
  */
 #include "CommonDef.h"
+#include "TXCAudioCommon.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -77,7 +78,7 @@ JNIEXPORT jint JNICALL Java_com_tencent_xiaowei_sdk_XWSDKJNI_statisticsPoint(
         pVal_param = env->GetStringUTFChars(param, 0);
     }
 
-    int nRet = tx_ai_audio_statistics_point(pVal_compass_name, pVal_event, pVal_param, time);
+    int nRet = txca_statistics_point(pVal_compass_name, pVal_event, pVal_param, time);
 
     __android_log_print(ANDROID_LOG_DEBUG, LOGFILTER, "statisticsPoint: ret %d.", nRet);
 

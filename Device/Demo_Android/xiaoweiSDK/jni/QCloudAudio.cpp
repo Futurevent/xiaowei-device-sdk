@@ -32,7 +32,7 @@ extern jclass s_serviceClass;
 extern jclass s_clsAudioAccount;
 extern jclass s_clsAudioAppInfo;
 extern jclass s_clsAudioContext;
-extern jclass s_clsAudioDeviceInfo;
+extern jclass s_clsAudioRequestParam;
 extern jclass s_clsAudioResource;
 extern jclass s_clsAudioResGroup;
 extern jclass s_clsAudioResponse;
@@ -125,8 +125,6 @@ bool on_request_callback(const char *voice_id, TXCA_EVENT event, const char *sta
                                                                "Lcom/tencent/xiaowei/info/XWContextInfo;");
                 jfieldID id_requestText = objEnv.Env()->GetFieldID(clsAudioResponse, "requestText",
                                                                    "Ljava/lang/String;");
-                jfieldID id_responseType = objEnv.Env()->GetFieldID(clsAudioResponse,
-                                                                    "responseType", "I");
                 jfieldID id_responseData = objEnv.Env()->GetFieldID(clsAudioResponse,
                                                                     "responseData",
                                                                     "Ljava/lang/String;");
@@ -137,10 +135,17 @@ bool on_request_callback(const char *voice_id, TXCA_EVENT event, const char *sta
                                                                  "[Lcom/tencent/xiaowei/info/XWResGroupInfo;");
                 jfieldID id_hasMorePlaylist = objEnv.Env()->GetFieldID(clsAudioResponse,
                                                                        "hasMorePlaylist", "Z");
+                jfieldID id_hasHistoryPlaylist = objEnv.Env()->GetFieldID(clsAudioResponse,
+                                                                       "hasHistoryPlaylist", "Z");
+
+
                 jfieldID id_isRecovery = objEnv.Env()->GetFieldID(clsAudioResponse, "recoveryAble",
                                                                   "Z");
                 jfieldID id_playBehavior = objEnv.Env()->GetFieldID(clsAudioResponse,
                                                                     "playBehavior", "I");
+                jfieldID id_resourceListType = objEnv.Env()->GetFieldID(clsAudioResponse,
+                                                                    "resourceListType", "I");
+
                 jfieldID id_isNotify = objEnv.Env()->GetFieldID(clsAudioResponse, "isNotify",
                                                                   "Z");
 
@@ -159,16 +164,6 @@ bool on_request_callback(const char *voice_id, TXCA_EVENT event, const char *sta
                                                                        "speakTimeout", "I");
                 jfieldID id_ctxsilentTimeout = objEnv.Env()->GetFieldID(clsAudioContext,
                                                                         "silentTimeout", "I");
-                jfieldID id_ctxvoiceReqBegin = objEnv.Env()->GetFieldID(clsAudioContext,
-                                                                        "voiceRequestBegin", "Z");
-                jfieldID id_ctxvoiceReqEnd = objEnv.Env()->GetFieldID(clsAudioContext,
-                                                                      "voiceRequestEnd", "Z");
-
-                jfieldID id_ctxprofileType = objEnv.Env()->GetFieldID(clsAudioContext,
-                                                                      "profileType", "I");
-
-                jfieldID id_ctxvoiceWakeupType = objEnv.Env()->GetFieldID(clsAudioContext, "voiceWakeupType", "I");
-                jfieldID id_voiceWakeupText = objEnv.Env()->GetFieldID(clsAudioContext, "voiceWakeupText", "Ljava/lang/String;");
 
                 jfieldID id_resformat = objEnv.Env()->GetFieldID(clsAudioResource, "format", "I");
                 jfieldID id_resOffset = objEnv.Env()->GetFieldID(clsAudioResource, "offset", "I");
@@ -242,19 +237,6 @@ bool on_request_callback(const char *voice_id, TXCA_EVENT event, const char *sta
                                           (jint) pRsp->context.speak_timeout);
                 objEnv.Env()->SetIntField(objContext, id_ctxsilentTimeout,
                                           (jint) pRsp->context.silent_timeout);
-                objEnv.Env()->SetBooleanField(objContext, id_ctxvoiceReqBegin,
-                                              (jboolean) pRsp->context.voice_request_begin);
-                objEnv.Env()->SetBooleanField(objContext, id_ctxvoiceReqEnd,
-                                              (jboolean) pRsp->context.voice_request_end);
-                objEnv.Env()->SetIntField(objContext, id_ctxprofileType,
-                                          (jint) pRsp->context.wakeup_profile);
-                objEnv.Env()->SetIntField(objContext, id_ctxvoiceWakeupType,
-                                          (jint) pRsp->context.wakeup_type);
-
-                jstring strWakeupText;
-                ConvChar2JString(objEnv.Env(), pRsp->context.wakeup_word, strWakeupText);
-                objEnv.Env()->SetObjectField(objContext, id_voiceWakeupText, strWakeupText);
-                objEnv.Env()->DeleteLocalRef(strWakeupText);
 
                 objEnv.Env()->SetObjectField(objRsp, id_context, objContext);
                 objEnv.Env()->DeleteLocalRef(strCtxID);
@@ -265,9 +247,6 @@ bool on_request_callback(const char *voice_id, TXCA_EVENT event, const char *sta
                 ConvChar2JString(objEnv.Env(), pRsp->request_text, strRequestText);
                 objEnv.Env()->SetObjectField(objRsp, id_requestText, strRequestText);
                 objEnv.Env()->DeleteLocalRef(strRequestText);
-
-                //response_type
-                objEnv.Env()->SetIntField(objRsp, id_responseType, pRsp->response_type);
 
                 //response_data
                 jstring strRspExtend;
@@ -329,6 +308,9 @@ bool on_request_callback(const char *voice_id, TXCA_EVENT event, const char *sta
                 objEnv.Env()->SetBooleanField(objRsp, id_hasMorePlaylist,
                                               (jboolean) pRsp->has_more_playlist);
 
+                objEnv.Env()->SetBooleanField(objRsp, id_hasHistoryPlaylist,
+                                              (jboolean) pRsp->has_history_playlist);
+
                 //is_recovery
                 objEnv.Env()->SetBooleanField(objRsp, id_isRecovery, (jboolean) pRsp->is_recovery);
                 objEnv.Env()->SetBooleanField(objRsp, id_isNotify, (jboolean) pRsp->is_notify);
@@ -336,6 +318,8 @@ bool on_request_callback(const char *voice_id, TXCA_EVENT event, const char *sta
 
                 //play_behavior
                 objEnv.Env()->SetIntField(objRsp, id_playBehavior, pRsp->play_behavior);
+
+                objEnv.Env()->SetIntField(objRsp, id_resourceListType, pRsp->resource_list_type);
             }
             jbyteArray jextend = NULL;
             if (extend_info_len > 0) {
@@ -437,19 +421,26 @@ bool on_request_callback(const char *voice_id, TXCA_EVENT event, const char *sta
  * @return
  */
 JNIEXPORT jint JNICALL
-Java_com_tencent_xiaowei_sdk_XWSDKJNI_startXiaoweiService(JNIEnv *env, jclass,
-                                                      jobject accountData) {
-    if (NULL == s_clsAudioDeviceInfo
-        || NULL == s_clsAudioAccount) {
-        __android_log_print(ANDROID_LOG_ERROR, LOGFILTER,
-                            "startXiaoweiService NULL == s_clsAudioDeviceInfo or NULL == s_clsAudioAccount");
-        return 0;
-    }
+Java_com_tencent_xiaowei_sdk_XWSDKJNI_startXiaoweiService(JNIEnv *env, jclass) {
 
     TXCA_CALLBACK callback = {0};
     callback.on_request_callback = on_request_callback;
     callback.on_net_delay_callback = on_net_delay_callback;
 
+    int nRet = txca_service_start(&callback);
+
+    return nRet;
+}
+
+
+JNIEXPORT void JNICALL
+Java_com_tencent_xiaowei_sdk_XWSDKJNI_setXWAccountInfo(JNIEnv *env, jclass,
+                                                      jobject accountData) {
+    if (NULL == s_clsAudioAccount) {
+        __android_log_print(ANDROID_LOG_ERROR, LOGFILTER,
+                            "NULL == s_clsAudioAccount");
+        return;
+    }
 
     jstring account;
     jstring token;
@@ -491,7 +482,7 @@ Java_com_tencent_xiaowei_sdk_XWSDKJNI_startXiaoweiService(JNIEnv *env, jclass,
         }
     }
 
-    int nRet = txca_service_start(&callback, &stAccount);
+    txca_set_account_info(&stAccount);
 
     if (stAccount.account) {
         env->ReleaseStringUTFChars(account, stAccount.account);
@@ -506,9 +497,8 @@ Java_com_tencent_xiaowei_sdk_XWSDKJNI_startXiaoweiService(JNIEnv *env, jclass,
         delete[] stAccount.buffer;
         stAccount.buffer = NULL;
     }
-
-    return nRet;
 }
+
 
 /**
  * 停止服务
@@ -530,47 +520,53 @@ JNIEXPORT jint JNICALL Java_com_tencent_xiaowei_sdk_XWSDKJNI_stopXiaoweiService(
  */
 JNIEXPORT jstring JNICALL
 Java_com_tencent_xiaowei_sdk_XWSDKJNI_request(JNIEnv *env, jclass, jint type,
-                                                 jbyteArray requestData, jobject context) {
-    if (NULL == s_clsAudioContext) {
-        __android_log_print(ANDROID_LOG_ERROR, LOGFILTER, "request NULL == s_clsAudioContext");
+                                                 jbyteArray requestData, jobject param) {
+    if (NULL == s_clsAudioRequestParam) {
+        __android_log_print(ANDROID_LOG_ERROR, LOGFILTER, "request NULL == s_clsAudioRequestParam");
         return 0;
     }
 
-    jclass clsAudioContext = s_clsAudioContext;
-    jfieldID id_ID = env->GetFieldID(clsAudioContext, "ID", "Ljava/lang/String;");
-    jfieldID id_speakTimeout = env->GetFieldID(clsAudioContext, "speakTimeout", "I");
-    jfieldID id_silentTimeout = env->GetFieldID(clsAudioContext, "silentTimeout", "I");
-    jfieldID id_voiceRequestBegin = env->GetFieldID(clsAudioContext, "voiceRequestBegin", "Z");
-    jfieldID id_voiceRequestEnd = env->GetFieldID(clsAudioContext, "voiceRequestEnd", "Z");
-    jfieldID id_ctxprofileType = env->GetFieldID(clsAudioContext, "profileType", "I");
-    jfieldID id_ctxvoiceWakeupType = env->GetFieldID(clsAudioContext, "voiceWakeupType", "I");
-    jfieldID id_voiceWakeupText = env->GetFieldID(clsAudioContext, "voiceWakeupText", "Ljava/lang/String;");
-    jfieldID id_requestParam = env->GetFieldID(clsAudioContext, "requestParam", "J");
-
-
-    jstring ID = (jstring) env->GetObjectField(context, id_ID);
-    jint speakTimeout = (jint) env->GetIntField(context, id_speakTimeout);
-    jint silentTimeout = (jint) env->GetIntField(context, id_silentTimeout);
-    jboolean voiceRequestBegin = (jboolean) env->GetBooleanField(context, id_voiceRequestBegin);
-    jboolean voiceRequestEnd = (jboolean) env->GetBooleanField(context, id_voiceRequestEnd);
-    jint profileType = (jint) env->GetIntField(context, id_ctxprofileType);
-    jint voiceWakeupType = (jint) env->GetIntField(context, id_ctxvoiceWakeupType);
-    jstring wakeupText = (jstring) env->GetObjectField(context, id_voiceWakeupText);
-    jlong requestParam = (jlong) env->GetLongField(context, id_requestParam);
     TXCA_PARAM_CONTEXT stContext = {0};
-    if (NULL != ID) {
-        stContext.id = env->GetStringUTFChars(ID, 0);
-    }
-    stContext.speak_timeout = speakTimeout;
-    stContext.silent_timeout = silentTimeout;
-    stContext.voice_request_begin = voiceRequestBegin;
-    stContext.voice_request_end = voiceRequestEnd;
-    stContext.wakeup_profile = TXCA_WAKEUP_PROFILE(profileType);
-    stContext.wakeup_type = TXCA_WAKEUP_TYPE(voiceWakeupType);
-    stContext.request_param = requestParam;
 
-    if(wakeupText) {
-        stContext.wakeup_word = env->GetStringUTFChars(wakeupText, 0);
+    jstring ID;
+    jstring wakeupText;
+    if(param != NULL) {
+        jclass clsAudioRequest = s_clsAudioRequestParam;
+        jfieldID id_ID = env->GetFieldID(clsAudioRequest, "contextId", "Ljava/lang/String;");
+        jfieldID id_speakTimeout = env->GetFieldID(clsAudioRequest, "speakTimeout", "I");
+        jfieldID id_silentTimeout = env->GetFieldID(clsAudioRequest, "silentTimeout", "I");
+        jfieldID id_voiceRequestBegin = env->GetFieldID(clsAudioRequest, "voiceRequestBegin", "Z");
+        jfieldID id_voiceRequestEnd = env->GetFieldID(clsAudioRequest, "voiceRequestEnd", "Z");
+        jfieldID id_ctxprofileType = env->GetFieldID(clsAudioRequest, "profileType", "I");
+        jfieldID id_ctxvoiceWakeupType = env->GetFieldID(clsAudioRequest, "voiceWakeupType", "I");
+        jfieldID id_voiceWakeupText = env->GetFieldID(clsAudioRequest, "voiceWakeupText", "Ljava/lang/String;");
+        jfieldID id_requestParam = env->GetFieldID(clsAudioRequest, "requestParam", "J");
+
+
+        ID = (jstring) env->GetObjectField(param, id_ID);
+        jint speakTimeout = (jint) env->GetIntField(param, id_speakTimeout);
+        jint silentTimeout = (jint) env->GetIntField(param, id_silentTimeout);
+        jboolean voiceRequestBegin = (jboolean) env->GetBooleanField(param, id_voiceRequestBegin);
+        jboolean voiceRequestEnd = (jboolean) env->GetBooleanField(param, id_voiceRequestEnd);
+        jint profileType = (jint) env->GetIntField(param, id_ctxprofileType);
+        jint voiceWakeupType = (jint) env->GetIntField(param, id_ctxvoiceWakeupType);
+        wakeupText = (jstring) env->GetObjectField(param, id_voiceWakeupText);
+        jlong requestParam = (jlong) env->GetLongField(param, id_requestParam);
+
+        if (NULL != ID) {
+            stContext.id = env->GetStringUTFChars(ID, 0);
+        }
+        stContext.speak_timeout = speakTimeout;
+        stContext.silent_timeout = silentTimeout;
+        stContext.voice_request_begin = voiceRequestBegin;
+        stContext.voice_request_end = voiceRequestEnd;
+        stContext.wakeup_profile = TXCA_WAKEUP_PROFILE(profileType);
+        stContext.wakeup_type = TXCA_WAKEUP_TYPE(voiceWakeupType);
+        stContext.request_param = requestParam;
+
+        if(wakeupText) {
+            stContext.wakeup_word = env->GetStringUTFChars(wakeupText, 0);
+        }
     }
 
     char *chat_data = NULL;
@@ -1800,6 +1796,76 @@ JNIEXPORT jint JNICALL Java_com_tencent_xiaowei_sdk_XWSDKJNI_reportEvent
     }
 
     return nRet;
+}
+
+
+void on_request_cmd(const char* voice_id, int err_code, const char * json) {
+    __android_log_print(ANDROID_LOG_DEBUG, LOGFILTER,
+                        "on_request_cmd voiceid:%s err_code:%d", voice_id,
+                        err_code);
+
+    if (NULL == tx_service) {
+        __android_log_print(ANDROID_LOG_INFO, LOGFILTER,
+                            "on_request_cmd NULL == tx_service");
+        return;
+    }
+
+    bool needRelease = false;
+    JNIEnv *env = Util_CreateEnv(&needRelease);
+    if (!env) return;
+
+    jclass cls = env->GetObjectClass(tx_service);
+    jstring strVoiceID;
+    ConvChar2JString(env, voice_id, strVoiceID);
+    jstring strJson;
+    ConvChar2JString(env, json, strJson);
+
+    jmethodID methodID = env->GetMethodID(cls, "OnRequest",
+                                          "(Ljava/lang/String;ILjava/lang/String;)V");
+    if (methodID) {
+        env->CallVoidMethod(tx_service, methodID, strVoiceID, err_code, strJson);
+    }
+
+    env->DeleteLocalRef(cls);
+    env->DeleteLocalRef(strVoiceID);
+    env->DeleteLocalRef(strJson);
+
+    if (needRelease)
+        Util_ReleaseEnv();
+}
+
+JNIEXPORT jstring JNICALL Java_com_tencent_xiaowei_sdk_XWSDKJNI_requestCmd
+        (JNIEnv *env, jclass, jstring cmd, jstring subCmd, jstring param) {
+    char szVoiceID[33] = {0};
+
+    const char *pVal_cmd = NULL;
+    if (cmd) {
+        pVal_cmd = env->GetStringUTFChars(cmd, 0);
+    }
+    const char *pVal_subCmd = NULL;
+    if (subCmd) {
+        pVal_subCmd = env->GetStringUTFChars(subCmd, 0);
+    }
+    const char *pVal_param = NULL;
+    if (param) {
+        pVal_param = env->GetStringUTFChars(param, 0);
+    }
+
+    txca_request_cmd(szVoiceID, pVal_cmd, pVal_subCmd, pVal_param, on_request_cmd);
+
+    jstring strVoiceID;
+    ConvChar2JString(env, szVoiceID, strVoiceID);
+
+    if (pVal_cmd) {
+        env->ReleaseStringUTFChars(cmd, pVal_cmd);
+    }
+    if (pVal_subCmd) {
+        env->ReleaseStringUTFChars(subCmd, pVal_subCmd);
+    }
+    if (pVal_param) {
+        env->ReleaseStringUTFChars(param, pVal_param);
+    }
+    return strVoiceID;
 }
 
 #ifdef __cplusplus

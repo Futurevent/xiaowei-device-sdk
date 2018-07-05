@@ -28,32 +28,26 @@ import com.tencent.xiaowei.util.JsonUtil;
  */
 public class XWResourceInfo implements Parcelable {
 
-    public static final int FormatTTS               = 0;    //TTS，ID=resID
-    public static final int FormatUrl               = 1;    //url，ID=playID；content=url
-    public static final int FormatNotify            = 2;    //通知类
-    public static final int FormatText              = 3;    //文本，content=文本字串
-    public static final int FormatCommand           = 4;    //指令，ID=指令ID；content=指令内容
-    public static final int FormatIntent            = 5;    //语义，content=语义json
 
     /**
      * 资源类型{@link XWCommonDef.ResourceFormat}
      */
-    public int         format;
+    public int format;
 
     /**
      * 资源ID
      */
-    public String      ID;
+    public String ID;
 
     /**
      * 资源内容
      */
-    public String      content;
+    public String content;
 
     /**
      * 扩展信息，json格式
      */
-    public String      extendInfo;
+    public String extendInfo;
 
     /**
      * 播放偏移量
@@ -65,7 +59,17 @@ public class XWResourceInfo implements Parcelable {
      */
     public int playCount;
 
-    public XWResourceInfo() {}
+    public XWResourceInfo() {
+    }
+
+    public XWResourceInfo(CmdRsp rsp) {
+        format = rsp.format;
+        ID = rsp.id;
+        content = rsp.content;
+        extendInfo = rsp.extend_buffer;
+        offset = rsp.offset;
+        playCount = rsp.play_count;
+    }
 
     protected XWResourceInfo(Parcel in) {
         format = in.readInt();
@@ -106,5 +110,14 @@ public class XWResourceInfo implements Parcelable {
     @Override
     public String toString() {
         return JsonUtil.toJson(this);
+    }
+
+    public class CmdRsp {
+        public int format;
+        public String id;
+        public String content;
+        public String extend_buffer;
+        public int offset;
+        public int play_count;
     }
 }

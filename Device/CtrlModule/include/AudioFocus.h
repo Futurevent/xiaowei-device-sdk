@@ -17,7 +17,7 @@
 #ifndef _AIAUDIO_AUDIOFOCUS_H_
 #define _AIAUDIO_AUDIOFOCUS_H_
 
-// 提供给OuterSkill需要使用声音焦点的时候调用
+// 声音焦点控制接口，包括内部的焦点管理或者使用平台自有的焦点管理。
 CXX_EXTERN_BEGIN
 
 #include "txctypedef.h"
@@ -35,6 +35,15 @@ enum DURATION_HINT
     AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK = -3, // 应该降低音量
 
 };
+
+enum AUDIOFOCUS_REQUEST_RESULT
+{
+    AUDIOFOCUS_REQUEST_FAILED = 0,// A failed focus change request.
+    AUDIOFOCUS_REQUEST_GRANTED = 1,// A successful focus change request.
+};
+
+
+//************** 下面是使用控制层焦点管理的接口 **************//
 
 // 焦点改变的回调，所有OuterSkill公用一个焦点回调，使用cookie区分
 typedef void (*audio_focus_change_function)(int cookie, int focus_change);
@@ -62,16 +71,37 @@ SDK_API void txc_request_audio_focus(int& cookie, DURATION_HINT duration);
 SDK_API void txc_abandon_audio_focus(int cookie);
 
 /**
- * 接口说明：释放所有的焦点监听
- */
-SDK_API void txc_abandon_all_audio_focus();
-
-/**
  * 接口说明：设置当前App(或者说控制层)可获得的焦点
  *
  * @param focus 仅可以是DURATION_HINT
  */
 SDK_API void txc_set_audio_focus(DURATION_HINT focus);
+
+/**
+ * 接口说明：释放所有的焦点监听，这个接口在使用外部焦点管理时也生效
+ */
+SDK_API void txc_abandon_all_audio_focus();
+
+//************** 下面是使用外部焦点管理的接口 **************//
+// 使用平台自有的焦点，需要实现这些接口
+struct tcx_xwei_audio_focus_interface
+{
+    // 焦点改变的回调，所有OuterSkill公用一个焦点回调，使用cookie区分
+    AUDIOFOCUS_REQUEST_RESULT (*on_request_audio_focus)(int cookie, DURATION_HINT hint);
+    // 需要播放了，需要申请系统的焦点了
+    AUDIOFOCUS_REQUEST_RESULT (*on_abandon_audio_focus)(int cookie);
+};
+
+// 使用平台自有的焦点，需要为其赋值并实现接口
+SDK_API extern tcx_xwei_audio_focus_interface audio_focus_interface;
+
+/**
+ * 接口说明：使用外部的焦点控制，需要实现tcx_xwei_audio_focus_interface并且在焦点改变的时候调用这个接口通知变化
+ *
+ * @param cookie 和tcx_xwei_audio_focus_interface.on_request_audio_focus的参数对应
+ * @param focus 仅可以是DURATION_HINT
+ */
+SDK_API void txc_set_audio_focus_interface_change(int cookie, DURATION_HINT focus);
 
 CXX_EXTERN_END
 

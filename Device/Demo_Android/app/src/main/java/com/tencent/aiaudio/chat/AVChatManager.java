@@ -22,18 +22,19 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
 import android.content.SharedPreferences;
+import android.media.AudioManager;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.os.RemoteException;
 import android.text.TextUtils;
 import android.util.Log;
 
+import com.tencent.aiaudio.CommonApplication;
 import com.tencent.aiaudio.service.AIAudioService;
 import com.tencent.av.IXWAudioChatService;
 import com.tencent.av.XWAVChatAIDLService;
 import com.tencent.utils.MusicPlayer;
 import com.tencent.xiaowei.control.Constants;
-import com.tencent.xiaowei.control.XWeiAudioFocusManager;
 import com.tencent.xiaowei.control.XWeiControl;
 import com.tencent.xiaowei.control.XWeiOuterSkill;
 import com.tencent.xiaowei.def.XWCommonDef;
@@ -109,7 +110,7 @@ public class AVChatManager {
 
     public static int mVideoPid;
 
-    private XWeiAudioFocusManager.OnAudioFocusChangeListener qqCallListener;
+    private AudioManager.OnAudioFocusChangeListener qqCallListener;
     private IXWAudioChatService mIXWAudioChatService;
     private ServiceConnection mConn = new ServiceConnection() {
         @Override
@@ -198,6 +199,10 @@ public class AVChatManager {
         });
     }
 
+    public void unInit() {
+        XWeiControl.getInstance().getXWeiOuterSkill().unRegisterSkillIdOrSkillName(SKILL_ID_QQ_CALL);
+    }
+
 
     //处理音视频电话的skill
     private XWeiOuterSkill.OuterSkillHandler qqCallSkillHandler = new XWeiOuterSkill.OuterSkillHandler() {
@@ -230,9 +235,16 @@ public class AVChatManager {
                     closeAudioChat(true);
                     break;
                 case QQCALL_BE_INVITED:
-                    if (peerId > 0)
-                        XWSDK.getInstance().requestProtocolTTS(peerId, 0, XWCommonDef.RequestProtocalType.CHAT, null);
-                    else {
+                    if (peerId > 0) {
+                        XWSDK.getInstance().request("TTS_TIPS", "qq_chat", "{\"tiny_id\":" + peerId + "}", new XWSDK.OnRspListener() {
+                            @Override
+                            public void onRsp(String voiceId, int error, String json) {
+                                XWResponseInfo rspData = XWResponseInfo.fromCmdJson(json);
+                                if (rspData.resources != null && rspData.resources.length > 0)
+                                    XWeiControl.getInstance().processResponse(voiceId, rspData, null);
+                            }
+                        });
+                    } else {
                         Log.e(TAG, "QQCall peerid is invalid.");
                     }
                     break;
@@ -240,9 +252,16 @@ public class AVChatManager {
 
             if (responseInfo.resultCode == XWCommonDef.XWeiErrorCode.VOICE_TIMEOUT && mState == 1) {
                 // 如果是接听电话模式，还未接通的时候，唤醒后一直不说话，就再播放一次铃声
-                if (mCurrentPeerId > 0)
-                    XWSDK.getInstance().requestProtocolTTS(mCurrentPeerId, 0, XWCommonDef.RequestProtocalType.CHAT, null);
-                else {
+                if (mCurrentPeerId > 0) {
+                    XWSDK.getInstance().request("TTS_TIPS", "qq_chat", "{\"tiny_id\":" + mCurrentPeerId + "}", new XWSDK.OnRspListener() {
+                        @Override
+                        public void onRsp(String voiceId, int error, String json) {
+                            XWResponseInfo rspData = XWResponseInfo.fromCmdJson(json);
+                            if (rspData.resources != null && rspData.resources.length > 0)
+                                XWeiControl.getInstance().processResponse(voiceId, rspData, null);
+                        }
+                    });
+                } else {
                     Log.e(TAG, "QQCall peerid is invalid.");
                 }
             }
@@ -261,11 +280,12 @@ public class AVChatManager {
             if (playList.size() > 0) {
                 playIndex = 0;
                 MusicPlayer.getInstance().stop();
-                qqCallListener = new XWeiAudioFocusManager.OnAudioFocusChangeListener() {
+                CommonApplication.mAudioManager.abandonAudioFocus(qqCallListener);
+                qqCallListener = new AudioManager.OnAudioFocusChangeListener() {
                     @Override
                     public void onAudioFocusChange(int focusChange) {
                         QLog.d(TAG, "onAudioFocusChange " + focusChange);
-                        if (focusChange == XWeiAudioFocusManager.AUDIOFOCUS_GAIN_TRANSIENT) {
+                        if (focusChange == AudioManager.AUDIOFOCUS_GAIN_TRANSIENT) {
                             MusicPlayer.getInstance().setVolume(100);
                             play(playList, new MusicPlayer.OnPlayListener() {
 
@@ -276,29 +296,32 @@ public class AVChatManager {
                                         service.wakeup(responseInfo.context.ID, 5000, 500, 0);
                                     }
                                     if (mState == 0) {
-                                        XWeiAudioFocusManager.getInstance().abandonAudioFocus(qqCallListener);
+                                        CommonApplication.mAudioManager.abandonAudioFocus(qqCallListener);
                                     }
                                 }
                             });
                             setPlayingStatus(true);
-                        } else if (focusChange == XWeiAudioFocusManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK) {
+                        } else if (focusChange == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK) {
                             MusicPlayer.getInstance().setVolume(20);
-                        } else if (focusChange == XWeiAudioFocusManager.AUDIOFOCUS_LOSS) {
+                        } else if (focusChange == AudioManager.AUDIOFOCUS_LOSS) {
                             MusicPlayer.getInstance().stop();
 
                             setPlayingStatus(false);
                         }
                     }
                 };
-                XWeiAudioFocusManager.getInstance().requestAudioFocus(qqCallListener, XWeiAudioFocusManager.AUDIOFOCUS_GAIN_TRANSIENT);
+                int ret = CommonApplication.mAudioManager.requestAudioFocus(qqCallListener, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN_TRANSIENT);
+                if (ret == AudioManager.AUDIOFOCUS_REQUEST_GRANTED) {
+                    qqCallListener.onAudioFocusChange(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT);
+                }
             } else if (QQCALL_CALL_OUT == command) {
-                qqCallListener = new XWeiAudioFocusManager.OnAudioFocusChangeListener() {
+                qqCallListener = new AudioManager.OnAudioFocusChangeListener() {
                     @Override
                     public void onAudioFocusChange(int focusChange) {
 
                     }
                 };
-                XWeiAudioFocusManager.getInstance().requestAudioFocus(qqCallListener, XWeiAudioFocusManager.AUDIOFOCUS_GAIN_TRANSIENT);
+                CommonApplication.mAudioManager.requestAudioFocus(qqCallListener, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN_TRANSIENT);
             }
 
             return true;
@@ -382,7 +405,8 @@ public class AVChatManager {
             } catch (Exception e) {
                 e.printStackTrace();
             }
-            XWeiAudioFocusManager.getInstance().abandonAudioFocus(qqCallListener);
+
+            CommonApplication.mAudioManager.abandonAudioFocus(qqCallListener);
         } else {
             if (mIXWAudioChatService == null) {
 

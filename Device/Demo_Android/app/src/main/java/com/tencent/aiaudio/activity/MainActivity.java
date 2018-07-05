@@ -56,9 +56,7 @@ import com.tencent.aiaudio.demo.R;
 import com.tencent.aiaudio.service.AIAudioService;
 import com.tencent.aiaudio.service.ControlService;
 import com.tencent.aiaudio.service.WakeupAnimatorService;
-import com.tencent.aiaudio.utils.DemoOnAudioFocusChangeListener;
 import com.tencent.aiaudio.utils.XiaomiUtil;
-import com.tencent.xiaowei.control.XWeiAudioFocusManager;
 import com.tencent.xiaowei.sdk.XWDeviceBaseManager;
 import com.tencent.xiaowei.util.QLog;
 
@@ -99,7 +97,7 @@ public class MainActivity extends BaseActivity {
         setContentView(R.layout.activity_main);
 
         initView();
-
+        mAudioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
         Intent intent = new Intent(this, AIAudioService.class);
         startService(intent);
         if (!BuildConfig.IS_NEED_VOICE_LINK) {
@@ -147,6 +145,14 @@ public class MainActivity extends BaseActivity {
             }
         }
     }
+
+    AudioManager.OnAudioFocusChangeListener lis = new AudioManager.OnAudioFocusChangeListener() {
+        @Override
+        public void onAudioFocusChange(int focusChange) {
+
+        }
+    };
+    AudioManager mAudioManager;
 
     private void initView() {
         vGray = findViewById(R.id.v_gray);
@@ -261,7 +267,8 @@ public class MainActivity extends BaseActivity {
         });
 
         ((TextView) findViewById(R.id.tv_din)).setText("din:" + XWDeviceBaseManager.getSelfDin());
-
+        int[] versions = XWDeviceBaseManager.getSDKVersion();
+        ((TextView) findViewById(R.id.tv_title)).setText("demo版本：" + versions[0] + "." + versions[1] + "." + versions[2] + "    ");
 
         ivErcode = (ImageView) findViewById(R.id.iv_ercode);
         if (XWDeviceBaseManager.getBinderList().size() == 0) {
@@ -307,13 +314,6 @@ public class MainActivity extends BaseActivity {
         super.onResume();
         if (WakeupAnimatorService.getInstance() != null)
             WakeupAnimatorService.getInstance().showFloat(WakeupAnimatorService.FLAG_MAIN_ACTIVITY);
-        if (XWeiAudioFocusManager.getInstance().needRequestFocus(AudioManager.AUDIOFOCUS_GAIN)) {
-            AudioManager mAudioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
-            int ret = mAudioManager.requestAudioFocus(DemoOnAudioFocusChangeListener.getInstance(), AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN);
-            if (ret == AudioManager.AUDIOFOCUS_REQUEST_GRANTED) {
-                XWeiAudioFocusManager.getInstance().setAudioFocusChange(AudioManager.AUDIOFOCUS_GAIN);
-            }
-        }
     }
 
     @Override

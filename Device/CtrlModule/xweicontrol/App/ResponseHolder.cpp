@@ -39,7 +39,7 @@ void CResponseHolder::Copy(const TXCA_PARAM_RESPONSE *response)
             respex_->skill_info.name = res_holder_->Hold(response->skill_info.name);
             respex_->skill_info.id = res_holder_->Hold(response->skill_info.id);
         }
-        
+
         {
             // response_->last_skill_info
             respex_->last_skill_info.name = res_holder_->Hold(response->last_skill_info.name);
@@ -50,7 +50,6 @@ void CResponseHolder::Copy(const TXCA_PARAM_RESPONSE *response)
             //  resp_this.context
             respex_->context.id = res_holder_->Hold(response->context.id);
         }
-        respex_->is_notify = response->is_notify;
 
         {
             if (response->resource_groups && response->resource_groups_size > 0)

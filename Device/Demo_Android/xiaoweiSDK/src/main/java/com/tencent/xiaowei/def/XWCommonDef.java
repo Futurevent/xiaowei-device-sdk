@@ -58,6 +58,22 @@ public class XWCommonDef {
     }
 
     /**
+     * 播放资源列表类型
+     */
+    public interface ResourceListType {
+
+        /**
+         * 默认的列表，当前列表。
+         */
+        int DEFAULT = 0;
+
+        /**
+         * 这个场景的历史列表
+         */
+        int HISTORY = 1;
+    }
+
+    /**
      * 播放资源入队行为定义
      */
     public interface PlayBehavior {
@@ -74,24 +90,27 @@ public class XWCommonDef {
          */
         int ENQUEUE_BACK = 2;
         /**
-         * 不中断当前播放的资源，替换列表中的资源
+         * 不中断当前播放的资源，替换列表
          */
         int ENQUEUE_REPLACE = 3;
         /**
          * 不中断播放，更新列表中某些播放资源的url和quality字段信息
          */
         int ENQUEUE_UPDATE = 4;
-
+        /**
+         * 不中断播放，更新列表中某些播放资源的url和所有description
+         */
+        int ENQUEUE_UPDATE_ALL = 5;
         /**
          * 从当前列表中移除这些元素
          */
-        int REMOVE = 5;
+        int REMOVE = 6;
 
     }
 
-    public interface RequestProtocalType {
-        int CHAT = 404;
+    public interface RequestProtocolType {
         int MSG = 403;
+        int CHAT = 404;
     }
 
     /**
@@ -120,12 +139,83 @@ public class XWCommonDef {
         int WAKEUP_CHECK = 4;
     }
 
+
+    /**
+     * 唤醒类型
+     */
+    public interface WAKEUP_TYPE {
+        /**
+         * 默认，纯本地唤醒或者按键唤醒
+         */
+        public final static int WAKEUP_TYPE_DEFAULT = 0;
+        /**
+         * 需要云端校验唤醒词的请求
+         */
+        public final static int WAKEUP_TYPE_CLOUD_CHECK = 1;
+
+        /**
+         * 纯本地唤醒但是需要云端过滤掉唤醒词
+         */
+        public final static int WAKEUP_TYPE_LOCAL_WITH_TEXT = 2;
+
+        /**
+         * 免唤醒：不唤醒直接收音，上传数据，目前只限"闹钟触发场景"
+         */
+        public final static int WAKEUP_TYPE_LOCAL_WITH_FREE = 3;
+    }
+
+    /**
+     * 远近场类型
+     */
+    public interface PROFILE_TYPE {
+        /**
+         * 远场
+         */
+        public final static int PROFILE_TYPE_FAR = 0;
+        /**
+         * 近场
+         */
+        public final static int PROFILE_TYPE_NEAR = 1;
+
+    }
+
+    /**
+     * 请求可带的参数，可以复合使用
+     */
+    public interface REQUEST_PARAM {
+        /**
+         * 不使用小微的Vad，使用本地的Vad，带上这个标记后，需要在说话结束后主动通知SDK voiceRequestEnd=true。
+         */
+        public static final int REQUEST_PARAM_USE_LOCAL_VAD = 0x1;
+
+        /**
+         * 使用GPS的位置，默认会使用IP所在的位置。暂未实现
+         */
+        public static final int REQUEST_PARAM_GPS = 0x2;
+
+        /**
+         * 使用本地的TTS，不接收小微的TTS push
+         */
+        public static final int REQUEST_PARAM_USE_LOCAL_TTS = 0x4;
+
+        /**
+         * 保存发送前的数据到 /sdcard/tencent/xiaowei/voice/send/voiceId.pcm ,格式为pcm
+         */
+        public static final int REQUEST_PARAM_DUMP_SEND_AUDIO_DATA = 0x8;
+
+        /**
+         * 这次请求不识别，只进行小微的Vad
+         */
+        public static final int REQUEST_PARAM_ONLY_VAD = 0x10;
+
+    }
+
     /**
      * 资源格式定义
      */
     public interface ResourceFormat {
         /**
-         * URL类型
+         * URL类型，
          */
         int URL = 0;
         /**
@@ -133,7 +223,7 @@ public class XWCommonDef {
          */
         int TEXT = 1;
         /**
-         * TTS类型
+         * TTS类型，ID=resID
          */
         int TTS = 2;
         /**
@@ -145,11 +235,11 @@ public class XWCommonDef {
          */
         int LOCATION = 4;
         /**
-         * 指令类型
+         * 指令类型，ID=指令ID；content=指令内容
          */
         int COMMAND = 5;
         /**
-         *
+         * 原始语义意图信息，content=语义json
          */
         int INTENT = 6;
         /**

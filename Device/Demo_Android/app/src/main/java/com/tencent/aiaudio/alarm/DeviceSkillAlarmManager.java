@@ -125,7 +125,7 @@ public class DeviceSkillAlarmManager implements IDeviceSkillAlarmManager {
             alarmBean.setKey(clockInfo.getClock_id());
             alarmBean.setEvent(clockInfo.getEvent());
             alarmBean.setAlarmTime(Long.valueOf(clockInfo.getTrig_time()) * 1000L);
-            alarmBean.setServerTime(XWDeviceBaseManager.getServerTime() * 1000L);
+            alarmBean.setServerTime(XWDeviceBaseManager.getServerTime());
             QLog.d(TAG, String.format("serverTime:%s, currentTime=%s",
                     alarmBean.getServerTime(), System.currentTimeMillis()));
             alarmBean.setServerTimeDifference(alarmBean.getServerTime() - System.currentTimeMillis());

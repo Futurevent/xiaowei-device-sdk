@@ -46,11 +46,11 @@ SDK_API int txca_data_report(TXCA_PARAM_LOG *log);
 SDK_API void txca_get_music_vip_info(char *voice_id);
 
 /**
- * 获取指定格式的提示类TTS，一般用于QQ电话、消息、导航等特殊场景
+ * 获取指定格式的提示类TTS，一般用于QQ电话、消息等特殊场景
  * @param voice_id  TTS的resId
  * @param tinyid    目标用户id，电话和消息需要填写
- * @param timestamp 时间 ,消息需要填，其余填0
- * @param cmd      类别
+ * @param timestamp 时间，消息需要填，其余填0
+ * @param cmd      类别，请参考TXCA_PROTOCOL_CMD_TYPE
  **/
 SDK_API int txca_request_protocol_tts(char* voice_id, unsigned long long tinyid, unsigned long long timestamp, int cmd);
 
@@ -65,6 +65,20 @@ SDK_API int txca_set_user_state(TXCA_PARAM_STATE *state);
  * 返回值 ：错误码（见全局错误码表）
  */
 SDK_API int txca_clear_user_state();
+
+/**
+ * 接口说明：上报埋点
+ * 返回值 ：错误码（见全局错误码表）
+ */
+SDK_API int txca_statistics_point(const char* compass_name, const char* event, const char* param, unsigned long long time);
+
+typedef void (*TXCA_ON_REQUEST_CMD_CALLBACK)(const char* voice_id, int err_code, const char * json);
+
+/**
+ * 接口说明：通用请求资源的接口
+ * 返回值 ：错误码（见全局错误码表）
+ */
+SDK_API int txca_request_cmd(char* voice_id, const char* cmd, const char* sub_cmd,  const char* param, TXCA_ON_REQUEST_CMD_CALLBACK callback);
 
 ///////////////////////////////////////////////////
 

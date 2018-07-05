@@ -1,13 +1,31 @@
+/*
+ * Tencent is pleased to support the open source community by making  XiaoweiSDK Demo Codes available.
+ *
+ * Copyright (C) 2017 THL A29 Limited, a Tencent company. All rights reserved.
+ *
+ * Licensed under the MIT License (the "License"); you may not use this file except in compliance
+ * with the License. You may obtain a copy of the License at
+ *
+ * http://opensource.org/licenses/MIT
+ *
+ * Unless required by applicable law or agreed to in writing, software distributed under the License
+ * is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
+ * or implied. See the License for the specific language governing permissions and limitations under
+ * the License.
+ *
+ */
 package com.tencent.aiaudio.alarm;
 
 import android.content.Context;
 import android.content.Intent;
+import android.media.AudioManager;
 import android.os.Bundle;
 import android.support.v4.content.LocalBroadcastManager;
+import android.util.Log;
 
+import com.tencent.aiaudio.CommonApplication;
 import com.tencent.utils.MusicPlayer;
 import com.tencent.xiaowei.control.Constants;
-import com.tencent.xiaowei.control.XWeiAudioFocusManager;
 import com.tencent.xiaowei.control.XWeiOuterSkill;
 import com.tencent.xiaowei.def.XWCommonDef;
 import com.tencent.xiaowei.info.XWAppInfo;
@@ -15,17 +33,18 @@ import com.tencent.xiaowei.info.XWPlayStateInfo;
 import com.tencent.xiaowei.info.XWResGroupInfo;
 import com.tencent.xiaowei.info.XWResponseInfo;
 import com.tencent.xiaowei.sdk.XWSDK;
+import com.tencent.xiaowei.util.QLog;
 
-import static com.tencent.xiaowei.control.Constants.SKILL_NAME.SKILL_NAME_TRIGGER_ALARM;
 import static com.tencent.xiaowei.control.Constants.SkillIdDef.SKILL_ID_ALARM;
-import static com.tencent.xiaowei.control.Constants.SkillIdDef.SKILL_ID_GLOBAL;
 import static com.tencent.xiaowei.control.Constants.SkillIdDef.SKILL_ID_TRIGGER_ALARM;
 
 public class AlarmSkillHandler implements XWeiOuterSkill.OuterSkillHandler {
 
+    public static final String TAG = AlarmSkillHandler.class.getSimpleName();
     public static final String EXTRA_KEY_CLOSE_ALARM = "extra_key_alarm_close";
     private Context mContext;
-    private XWeiAudioFocusManager.OnAudioFocusChangeListener listener;
+    private AudioManager.OnAudioFocusChangeListener listener;
+    private static MusicPlayer player = new MusicPlayer();
 
     public AlarmSkillHandler(Context context) {
         this.mContext = context;
@@ -53,16 +72,18 @@ public class AlarmSkillHandler implements XWeiOuterSkill.OuterSkillHandler {
         boolean handled = DeviceSkillAlarmManager.instance().isSetAlarmOperation(responseInfo);
         final boolean isSnooze = DeviceSkillAlarmManager.instance().isSnoozeAlarm(responseInfo);
 
+        Log.d(TAG, "handleAlarm isSnooze: " + isSnooze);
         if (handled) {
             handled = DeviceSkillAlarmManager.instance().operationAlarmSkill(responseInfo);
         }
 
         // 除了增删改闹钟场景外，有可能还有存在单TTS播放资源
         if (handled || (responseInfo.resources.length > 0 && responseInfo.resources[0].resources.length > 0)) {
-            listener = new XWeiAudioFocusManager.OnAudioFocusChangeListener() {
+            CommonApplication.mAudioManager.abandonAudioFocus(listener);
+            listener = new AudioManager.OnAudioFocusChangeListener() {
                 @Override
                 public void onAudioFocusChange(int focusChange) {
-                    if (focusChange == XWeiAudioFocusManager.AUDIOFOCUS_GAIN_TRANSIENT) {
+                    if (focusChange == AudioManager.AUDIOFOCUS_GAIN_TRANSIENT) {
                         XWPlayStateInfo stateInfo = new XWPlayStateInfo();
                         stateInfo.appInfo = new XWAppInfo();
                         stateInfo.appInfo.ID = Constants.SkillIdDef.SKILL_ID_ALARM;
@@ -73,18 +94,20 @@ public class AlarmSkillHandler implements XWeiOuterSkill.OuterSkillHandler {
                         if (responseInfo.resources != null
                                 && responseInfo.resources.length == 1
                                 && responseInfo.resources[0].resources[0].format == XWCommonDef.ResourceFormat.TTS) {
-                            MusicPlayer.getInstance().playMediaInfo(responseInfo.resources[0].resources[0], new MusicPlayer.OnPlayListener() {
+                            Log.d(TAG, "onAudioFocusChange playMediaInfo");
+
+                            player.playMediaInfo(responseInfo.resources[0].resources[0], new MusicPlayer.OnPlayListener() {
                                 @Override
                                 public void onCompletion(int error) {
                                     if (isSnooze) {
                                         sendBroadcast(EXTRA_KEY_CLOSE_ALARM, null);
                                     }
-                                    XWeiAudioFocusManager.getInstance().abandonAudioFocus(listener);
+                                    CommonApplication.mAudioManager.abandonAudioFocus(listener);
                                 }
 
                             });
                         }
-                    } else if (focusChange == XWeiAudioFocusManager.AUDIOFOCUS_LOSS) {
+                    } else if (focusChange == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT || focusChange == AudioManager.AUDIOFOCUS_LOSS) {
                         XWPlayStateInfo stateInfo = new XWPlayStateInfo();
                         stateInfo.appInfo = new XWAppInfo();
                         stateInfo.appInfo.ID = Constants.SkillIdDef.SKILL_ID_ALARM;
@@ -95,12 +118,16 @@ public class AlarmSkillHandler implements XWeiOuterSkill.OuterSkillHandler {
                         if (isSnooze) {
                             sendBroadcast(EXTRA_KEY_CLOSE_ALARM, null);
                         }
-                        MusicPlayer.getInstance().stop();
+                        player.stop();
+                        CommonApplication.mAudioManager.abandonAudioFocus(listener);
                     }
                 }
             };
 
-            XWeiAudioFocusManager.getInstance().requestAudioFocus(listener, XWeiAudioFocusManager.AUDIOFOCUS_GAIN_TRANSIENT);
+            int ret = CommonApplication.mAudioManager.requestAudioFocus(listener, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN_TRANSIENT);
+            if (ret == AudioManager.AUDIOFOCUS_REQUEST_GRANTED) {
+                listener.onAudioFocusChange(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT);
+            }
         }
 
         return handled || (responseInfo.resources.length > 0 && responseInfo.resources[0].resources.length > 0);

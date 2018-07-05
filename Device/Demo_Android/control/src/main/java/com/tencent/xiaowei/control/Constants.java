@@ -37,13 +37,13 @@ public class Constants {
         int PLAYER_CONTROL_NULL = 0,
                 PLAYER_BEGIN_PLAYER_CONTROL = 1,
                 PLAYER_STOP = 2,
-                PLAYER_PLAY = 3,    //  arg1: index
+                PLAYER_PLAY = 3,    //  arg1: index  arg2:list_type
                 PLAYER_PAUSE = 4,   //
                 PLAYER_RESUME = 5,  //
                 PLAYER_VOLUME = 6,  //  arg1: value of volume
 
         PLAYER_BEGIN_NAVIGATE = 0x100,
-                PLAYER_REPEAT = 0x101,  //  arg1: repeat_mode
+                PLAYER_REPEAT = 0x101,  //  arg1: repeat_modePLAYER_PLAY
                 PLAYER_NEXT = 0x102,   //  arg1: +n|-n indexes
                 PLAYER_SKIP = 0x103,   //  arg1: skip +n|-n milliseconds
 
@@ -116,7 +116,7 @@ public class Constants {
     }
 
     /**
-            * 播放模式
+     * 播放模式
      */
     public interface RepeatMode {
 
@@ -292,4 +292,23 @@ public class Constants {
         int REWIND_TO = 700155;// 快退到
 
     }
+
+    public interface GET_MORE_LIST_TYPE {
+
+        /**
+         * 需要获取历史列表
+         */
+        int TYPE_GET_HISTORY = 0;
+
+        /**
+         * 需要往前加载
+         */
+        int TYPE_GET_MORE_UP = 1;
+
+        /**
+         * 需要往后加载
+         */
+        int TYPE_GET_MORE = 2;
+    }
+
 }

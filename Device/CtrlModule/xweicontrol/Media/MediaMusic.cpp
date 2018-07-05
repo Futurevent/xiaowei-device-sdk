@@ -30,7 +30,7 @@ CMediaMusic::CMediaMusic(const std::string &res_id)
     inited_ = false;
 }
 
-void CMediaMusic::Init(const char *content, const char *mediaInfo, unsigned long long offset, unsigned int play_count)
+void CMediaMusic::Init(const char *content, const char *mediaInfo, unsigned long long offset, unsigned int play_count, int belong_list_type)
 {
     if (!inited_)
     {
@@ -38,6 +38,7 @@ void CMediaMusic::Init(const char *content, const char *mediaInfo, unsigned long
         description_ = (mediaInfo == NULL ? "" : mediaInfo);
         offset_ = offset;
         play_count_ = (play_count > 0 ? play_count : -1);
+        belong_list_type_ = belong_list_type;
 
         info_.content = content_.c_str();
         info_.offset = offset_;

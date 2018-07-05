@@ -33,7 +33,7 @@ CAudioPlayer::~CAudioPlayer()
 
 void CAudioPlayer::Play(int type, const char *url)
 {
-    
+    // 播放资源资源
 }
 
 void CAudioPlayer::TTSPushStart(int sample, int channel, int pcmSample)

@@ -28,10 +28,35 @@ import java.util.HashMap;
 public class XWeiMsgManager {
     private static final String TAG = "XWeiMsgManager";
 
-    private static HashMap<Long, XWSDK.OnSendMessageListener> mOnSendMessageListener = new HashMap<>();
+    private static HashMap<Long, OnSendMessageListener> mOnSendMessageListener = new HashMap<>();
 
+    /**
+     * 发送消息的进度和结果
+     */
+    public interface OnSendMessageListener {
+        /**
+         * 发送消息的进度
+         *
+         * @param transferProgress
+         * @param maxTransferProgress
+         */
+        void onProgress(long transferProgress, long maxTransferProgress);
 
-    public static long sendMessage(XWeiMessageInfo msg, XWSDK.OnSendMessageListener listener) {
+        /**
+         * 发送消息的结果
+         *
+         * @param errCode
+         */
+        void onComplete(int errCode);
+    }
+
+    /**
+     * 发送消息
+     *
+     * @param msg      消息体
+     * @param listener 监听器
+     */
+    public static long sendMessage(XWeiMessageInfo msg, OnSendMessageListener listener) {
         if (msg == null)
             return -1;
 
@@ -60,7 +85,7 @@ public class XWeiMsgManager {
         long cookie = -1;
         switch (msg.type) {
             case XWeiMessageInfo.TYPE_AUDIO:
-                cookie = XWSDKJNI.getInstance().nativeSendAudioMsg(3, msg.content, msg.duration, targetIds);
+                cookie = XWSDKJNI.nativeSendAudioMsg(3, msg.content, msg.duration, targetIds);
                 break;
             default:
                 break;
@@ -76,9 +101,9 @@ public class XWeiMsgManager {
         return cookie;
     }
 
-    public static void OnRichMsgSendProgress(int cookie, long transfer_progress, long max_transfer_progress){
+    static void OnRichMsgSendProgress(int cookie, long transfer_progress, long max_transfer_progress) {
         QLog.d(TAG, "mOnSendMessageListener size:" + mOnSendMessageListener.size());
-        final XWSDK.OnSendMessageListener listener = mOnSendMessageListener.get((long)cookie);
+        final OnSendMessageListener listener = mOnSendMessageListener.get((long)cookie);
         if (listener != null) {
             listener.onProgress(transfer_progress, max_transfer_progress);
         } else {
@@ -86,9 +111,9 @@ public class XWeiMsgManager {
         }
     }
 
-    public static void OnRichMsgSendRet(int cookie, int err_code){
+    static void OnRichMsgSendRet(int cookie, int err_code) {
         QLog.d(TAG, "mOnSendMessageListener size:" + mOnSendMessageListener.size());
-        final XWSDK.OnSendMessageListener listener = mOnSendMessageListener.get((long)cookie);
+        final OnSendMessageListener listener = mOnSendMessageListener.get((long)cookie);
         if (listener != null) {
             listener.onComplete(err_code);
         } else {

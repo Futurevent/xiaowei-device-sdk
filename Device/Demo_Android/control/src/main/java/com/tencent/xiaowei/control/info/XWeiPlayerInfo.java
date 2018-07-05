@@ -29,10 +29,9 @@ public class XWeiPlayerInfo implements Parcelable {
     public int status;     //  com.tencent.aiaudio.Constants.XWeiInnerPlayerStatus
     public int repeatMode; //  com.tencent.aiaudio.Constants.XWeiRepeatMode
 
-    public int playlistId;    // current playlist
+    public int sessionId;    // current playlist
 
     public int volume;
-    public int quality;
 
     public XWeiPlayerInfo() {
     }
@@ -41,10 +40,9 @@ public class XWeiPlayerInfo implements Parcelable {
         status = in.readInt();
         repeatMode = in.readInt();
 
-        playlistId = in.readInt();
+        sessionId = in.readInt();
 
         volume = in.readInt();
-        quality = in.readInt();
     }
 
     public static final Creator<XWeiPlayerInfo> CREATOR = new Creator<XWeiPlayerInfo>() {
@@ -69,10 +67,9 @@ public class XWeiPlayerInfo implements Parcelable {
         dest.writeInt(status);
         dest.writeInt(repeatMode);
 
-        dest.writeInt(playlistId);
+        dest.writeInt(sessionId);
 
         dest.writeInt(volume);
-        dest.writeInt(quality);
     }
 
     @Override

@@ -30,7 +30,6 @@ import com.tencent.xiaowei.control.info.XWeiMediaInfo;
 import com.tencent.xiaowei.control.info.XWeiPlayState;
 import com.tencent.xiaowei.def.XWCommonDef;
 import com.tencent.xiaowei.info.XWAppInfo;
-import com.tencent.xiaowei.info.XWContextInfo;
 import com.tencent.xiaowei.info.XWEventLogInfo;
 import com.tencent.xiaowei.info.XWPlayStateInfo;
 import com.tencent.xiaowei.info.XWResponseInfo;
@@ -47,6 +46,7 @@ public class XWeiPlayer implements IXWeiPlayer {
 
     private int mPlayState;
     private int mAudioSessionId;
+    private XWeiPlayState mXWeiPlayState;
 
     static class PlayState {
         /**
@@ -103,7 +103,7 @@ public class XWeiPlayer implements IXWeiPlayer {
 
     public XWeiPlayer(int sessionId) {
         this.mSessionId = sessionId;
-        mHandlerThread = new HandlerThread("xiaowei_player");
+        mHandlerThread = new HandlerThread("xiaowei_player_" + sessionId);
         mHandlerThread.start();
         mHandler = new Handler(mHandlerThread.getLooper());
 
@@ -147,6 +147,7 @@ public class XWeiPlayer implements IXWeiPlayer {
 
                     if (mPostionDelay > 0) {
                         seekTo(mPostionDelay * 1000);
+                        reportCurrentPlayState();
                         mPostionDelay = 0;
                     }
                 } else {
@@ -247,19 +248,15 @@ public class XWeiPlayer implements IXWeiPlayer {
 
     @Override
     public void onNeedReportPlayState(int sessionId, XWeiPlayState playState) {
-        if (mCurrentPlayer != null) {
-            playState.position = mCurrentPlayer.getCurrentPosition() / 1000;
-        }
-        XWPlayStateInfo stateInfo = new XWPlayStateInfo();
-        stateInfo.appInfo = new XWAppInfo();
-        stateInfo.appInfo.ID = playState.skillId;
-        stateInfo.appInfo.name = playState.skillName;
-        stateInfo.playID = playState.resId;
-        stateInfo.playContent = playState.content;
-        stateInfo.state = playState.playState;
-        stateInfo.playMode = playState.playMode;
-        stateInfo.playOffset = playState.position;
-        XWSDK.getInstance().reportPlayState(stateInfo);
+        mXWeiPlayState = playState;
+        reportCurrentPlayState();
+    }
+
+    @Override
+    public void release() {
+        clearCurrentPlayer();
+        mHandler.removeCallbacksAndMessages(null);
+        mHandlerThread.quit();
     }
 
     @Override
@@ -282,8 +279,25 @@ public class XWeiPlayer implements IXWeiPlayer {
     public void seekTo(int position) {
         if (mCurrentPlayer != null) {
             mCurrentPlayer.seekTo(position);
+            reportCurrentPlayState();
         } else {
             mPostionDelay = position;
+        }
+    }
+
+    private void reportCurrentPlayState() {
+        if (mXWeiPlayState != null) {
+            XWPlayStateInfo stateInfo = new XWPlayStateInfo();
+            stateInfo.appInfo = new XWAppInfo();
+            stateInfo.appInfo.ID = mXWeiPlayState.skillId;
+            stateInfo.appInfo.name = mXWeiPlayState.skillName;
+            stateInfo.playID = mXWeiPlayState.resId;
+            stateInfo.playContent = mXWeiPlayState.content;
+            stateInfo.state = mXWeiPlayState.playState;
+            stateInfo.playMode = mXWeiPlayState.playMode;
+            if (mCurrentPlayer != null)
+                stateInfo.playOffset = mCurrentPlayer.getCurrentPosition() / 1000;
+            XWSDK.getInstance().reportPlayState(stateInfo);
         }
     }
 
@@ -335,7 +349,7 @@ public class XWeiPlayer implements IXWeiPlayer {
                     QLog.d(TAG, "现在有资源在播放。");
                     clearCurrentPlayer();
                 }
-                mPlayState = PlayState.INIT;// 重置状态
+                mPlayState = PlayState.START;// 重置状态
                 if (TextUtils.isEmpty(mediaInfo.resId)) {
                     QLog.e(TAG, "playResEx error. resId is null.");
                     return;
@@ -347,8 +361,8 @@ public class XWeiPlayer implements IXWeiPlayer {
                         playUrl(mediaInfo.content, mediaInfo.offset);
                         break;
                     case XWMediaType.TYPE_TTS_TEXT:
-                        case XWMediaType.TYPE_TTS_TEXT_TIP:
-                        XWSDK.getInstance().requestTTS(mediaInfo.content.getBytes(), new XWContextInfo(), new XWSDK.RequestListener() {
+                    case XWMediaType.TYPE_TTS_TEXT_TIP:
+                        XWSDK.getInstance().requestTTS(mediaInfo.content.getBytes(), new XWSDK.RequestListener() {
                             @Override
                             public boolean onRequest(int event, XWResponseInfo rspData, byte[] extendData) {
                                 QLog.d(TAG, "playMediaInfo requestTTS");
@@ -365,18 +379,6 @@ public class XWeiPlayer implements IXWeiPlayer {
                         break;
                     case XWMediaType.TYPE_TTS_OPUS:
                         playTTS(sessionId, mediaInfo.resId, needReleaseRes);
-                        break;
-                    case XWMediaType.TYPE_TTS_MSGPROMPT:
-                        long tinyId = Long.valueOf(mediaInfo.content);
-                        long timestamp = Long.valueOf(mediaInfo.description);
-                        XWSDK.getInstance().requestProtocolTTS(tinyId, timestamp, 403, new XWSDK.RequestListener() {
-                            @Override
-                            public boolean onRequest(int event, XWResponseInfo rspData, byte[] extendData) {
-                                QLog.d(TAG, "playMediaInfo requestProtocolTTS resId: " + rspData.voiceID);
-                                playTTS(sessionId, rspData.voiceID, true);
-                                return true;
-                            }
-                        });
                         break;
                     default:
                         break;

@@ -42,7 +42,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
  * 日志文件的存储在/sdcard/tencent/xiaowei目录中<br>
  * 日志文件命名规则，一个小时生成一个文件，文件的签字是进程名+日期<br>
  * 日志文件系统采用cahce机制，LOG_ITEM_MAX_CACHE_SIZE是默认cahce大小 超过这个大小继续加入日志时触发写文件。<br>
- *
+ * <p>
  * 测试阶段可以打开日志保存便于定位问题，发布时候可以关闭
  */
 public class QLog {
@@ -78,6 +78,7 @@ public class QLog {
     private static long lastPrintMemoryTime;
     private static Context mContext;
     private static boolean mLogAble = true;
+    private static boolean saveAble = true;// 保存到sdcard，正式上线应该关闭
 
     static {
         logPath = Environment.getExternalStorageDirectory().getPath() + "/tencent/xiaowei/logs/";
@@ -152,7 +153,7 @@ public class QLog {
 
     public static void v(String tag, int level, String msg, Throwable ex) {
         if (mLogAble)
-            Log.i(tag, msg + (ex == null ? "" : " " + ex.toString()));
+            Log.i(tag, msg + (ex == null ? "" : " " + ex.toString()));// 有的手机打不出低级别日志，先打成i
         if (isCLR) {
             // 染色用户才上报
             addLogItem(tag, "V", msg + (ex == null ? "" : " " + ex.toString()));
@@ -172,7 +173,7 @@ public class QLog {
     }
 
     public static void d(String tag, int level, String msg, Throwable ex) {
-        if (mLogAble) Log.i(tag, msg + (ex == null ? "" : " " + ex.toString()));
+        if (mLogAble) Log.i(tag, msg + (ex == null ? "" : " " + ex.toString()));// 有的手机打不出低级别日志，先打成i
         if (isCLR) {
             // 染色用户才上报
             addLogItem(tag, "D", msg + (ex == null ? "" : " " + ex.toString()));
@@ -254,6 +255,9 @@ public class QLog {
 
 
     private static void addLogItem(String tag, String level, String msg) {
+        if (!saveAble) {
+            return;
+        }
         LogItem log = new LogItem();
         log.tag = tag;
         log.msg = msg;
@@ -277,13 +281,17 @@ public class QLog {
     }
 
 
-    private static void initWriter(String path) throws IOException {
+    private static void initWriter(String path) throws Exception {
         File menu = new File(logPath);
         File file;
 
         try {
             if (!menu.exists()) {
-                menu.mkdirs();
+                if (!menu.mkdirs()) {
+                    saveAble = false;
+                    list.clear();
+                    throw new RuntimeException("Cannot create qlog file.");
+                }
             }
             file = new File(path);
             if (!file.exists()) {
@@ -350,18 +358,19 @@ public class QLog {
      * 将缓冲区Log刷到文件
      */
     public static void flushLog(final QLogFlushListener listener) {
-        if (QLogUtil.maxLogSize <= 1024) {
-            listener.onCompletion();
+        if (QLogUtil.maxLogSize <= 1024 || !saveAble) {
+            if (listener != null)
+                listener.onCompletion();
+            return;
+        }
+        if (mHandler == null) {
+            if (mLogAble) Log.e("QLog", "You should called init at first.");
+            if (listener != null) {
+                listener.onCompletion();
+            }
             return;
         }
         synchronized (list) {
-            if (mHandler == null) {
-                if (mLogAble) Log.e("QLog", "You should called init at first.");
-                if (listener != null) {
-                    listener.onCompletion();
-                }
-                return;
-            }
             if (list.size() == 0) {
                 if (listener != null) {
                     listener.onCompletion();
@@ -392,8 +401,7 @@ public class QLog {
                             }
                         }
                         writer.flush();
-                    } catch (IOException e) {
-                        e.printStackTrace();
+                    } catch (Exception e) {
                     } finally {
                         if (listener != null) {
                             listener.onCompletion();

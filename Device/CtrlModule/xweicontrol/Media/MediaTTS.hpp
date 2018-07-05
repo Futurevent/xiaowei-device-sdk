@@ -25,26 +25,20 @@
 // TTS类型的Media
 class CMediaTTS : public CMedia
 {
-  public:
-    void Init(const char *content, unsigned int play_count);
-    void SetComplete();
+public:
+  void Init(const char *content, unsigned int play_count);
 
-    //  见 txc_media_read() 声明
-    virtual int Read(_Out_ const void **data, _Out_ size_t *data_size, _In_ size_t offset);
+  //  见 txc_media_read() 声明
+  virtual int Read(_Out_ const void **data, _Out_ size_t *data_size, _In_ size_t offset);
 
-  protected:
-    CMediaTTS(const std::string &res_id);
+protected:
+  CMediaTTS(const std::string &res_id);
 
-  private:
-    friend class TXCMediaCenter;
+private:
+  friend class TXCMediaCenter;
 
-  private:
-    unsigned int sample_;
-    unsigned int channel_;
-    unsigned int pcm_sample_;
-    bool inited_;
-
-    bool completed_;
+private:
+  bool inited_;
 };
 
 #endif /* MediaTTS_hpp */

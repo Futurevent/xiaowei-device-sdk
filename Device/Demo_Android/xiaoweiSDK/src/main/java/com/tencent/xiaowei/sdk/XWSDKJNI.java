@@ -28,14 +28,13 @@ import com.tencent.xiaowei.info.XWBinderInfo;
 import com.tencent.xiaowei.info.XWBinderRemark;
 import com.tencent.xiaowei.info.XWCCMsgInfo;
 import com.tencent.xiaowei.info.XWContactInfo;
-import com.tencent.xiaowei.info.XWContextInfo;
 import com.tencent.xiaowei.info.XWEventLogInfo;
 import com.tencent.xiaowei.info.XWFileTransferInfo;
 import com.tencent.xiaowei.info.XWLoginStatusInfo;
 import com.tencent.xiaowei.info.XWPlayStateInfo;
+import com.tencent.xiaowei.info.XWRequestInfo;
 import com.tencent.xiaowei.info.XWResponseInfo;
 import com.tencent.xiaowei.info.XWTTSDataInfo;
-import com.tencent.xiaowei.info.XWeiMessageInfo;
 import com.tencent.xiaowei.util.QLog;
 import com.tencent.xiaowei.util.QLogUtil;
 import com.tencent.xiaowei.util.Singleton;
@@ -134,9 +133,9 @@ public class XWSDKJNI {
     /**
      * 登录成功后，可以获取腾讯云服务器标准校时时间
      *
-     * @return 返回是32位服务器校时时间(s)
+     * @return 返回是64位服务器校时时间(ms)
      */
-    static native int getServerTime();
+    static native long getServerTime();
 
     /**
      * 获取自己din
@@ -264,11 +263,13 @@ public class XWSDKJNI {
     static native String uploadLog(String url, String text);
 
     /**********语音识别核心请求 begin**********/
-    static native int startXiaoweiService(XWAccountInfo accountInfo);
+    static native void startXiaoweiService();
 
     static native int stopXiaoweiService();
 
-    static native String request(int type, byte[] requestData, XWContextInfo context);
+    static native void setXWAccountInfo(XWAccountInfo info);
+
+    static native String request(int type, byte[] requestData, XWRequestInfo param);
 
     static native int cancelRequest(String voiceID);
 
@@ -370,6 +371,9 @@ public class XWSDKJNI {
      */
     static native String getMusicVipInfo();
 
+    /**
+     * 错误反馈，上报上一次的语音请求
+     */
     static native void errorFeedBack();
 
 
@@ -432,13 +436,6 @@ public class XWSDKJNI {
     /*********QQCall End********/
 
     /**
-     * 查询小微的好友列表
-     *
-     * @return
-     */
-    static native String getAIAudioFriendList();
-
-    /**
      * 请求指定格式的TTS，给视频通话、消息、导航等特殊场景使用
      *
      * @param tinyid    目标用户id，电话和消息需要填写
@@ -458,6 +455,9 @@ public class XWSDKJNI {
      * @return cookie，可以根据该cookie值在OnRichMsgSendProgress和OnRichMsgSendRet回调中查询进度信息和结果信息
      */
     static native long nativeSendAudioMsg(int msgId, String file_path, int duration, long[] targetIds);
+
+
+    static native String requestCmd(String cmd, String subCmd, String params);
 
     /************************************jni callback begin************************************/
 
@@ -508,8 +508,8 @@ public class XWSDKJNI {
         XWDeviceBaseManager.onConnectedServer(error);
     }
 
-    private void onRegisterResult(int error, int sub) {
-        XWDeviceBaseManager.onRegister(error, sub);
+    private void onRegisterResult(int error, int sub, long din) {
+        XWDeviceBaseManager.onRegister(error, sub, din);
     }
 
     private void onOnlineSuccess() {
@@ -669,7 +669,7 @@ public class XWSDKJNI {
                     return;
                 }
                 QLog.d(TAG, "准备上报 " + path);
-                XWFileTransferManager.uploadFile(path, XWFileTransferInfo.TYPE_TRANSFER_CHANNEL_MINI, XWFileTransferInfo.TYPE_TRANSFER_FILE_OTHER, new XWSDK.OnFileTransferListener() {
+                XWFileTransferManager.uploadFile(path, XWFileTransferInfo.TYPE_TRANSFER_CHANNEL_MINI, XWFileTransferInfo.TYPE_TRANSFER_FILE_OTHER, new XWFileTransferManager.OnFileTransferListener() {
                     @Override
                     public void onProgress(long transferProgress, long maxTransferProgress) {
 
@@ -729,19 +729,11 @@ public class XWSDKJNI {
             for (XWBinderRemark remark : binderRemarks) {
                 XWContactInfo info = XWDeviceBaseManager.mAllFriendListCache.get(remark.tinyid);
                 if (info != null) {
-                    info.remark = remark.remark;
+                    info.xwRemark = remark.remark;
                 }
             }
         }
         XWDeviceBaseManager.onGetBinderRemarkList(cookie, binderRemarks);
-    }
-
-    public static void downloadMiniFile(String fileKey, int fileType, String miniToken, XWSDK.OnFileTransferListener listener) {
-        XWFileTransferManager.downloadMiniFile(fileKey, fileType, miniToken, listener);
-    }
-
-    public static long sendMessage(XWeiMessageInfo msg, XWSDK.OnSendMessageListener listener) {
-        return XWeiMsgManager.sendMessage(msg, listener);
     }
 
     private void OnRichMsgSendProgress(int cookie, long transfer_progress, long max_transfer_progress) {
@@ -750,5 +742,9 @@ public class XWSDKJNI {
 
     private void OnRichMsgSendRet(int cookie, int err_code) {
         XWeiMsgManager.OnRichMsgSendRet(cookie, err_code);
+    }
+
+    private void OnRequest(String voiceId, int error, String json) {
+        XWSDK.getInstance().onRequest(voiceId, error, json);
     }
 }

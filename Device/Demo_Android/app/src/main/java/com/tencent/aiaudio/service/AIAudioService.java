@@ -39,15 +39,13 @@ import com.tencent.aiaudio.chat.AVChatManager;
 import com.tencent.aiaudio.demo.IAIAudioService;
 import com.tencent.aiaudio.player.XWeiPlayerMgr;
 import com.tencent.aiaudio.utils.AssetsUtil;
-import com.tencent.aiaudio.utils.DemoOnAudioFocusChangeListener;
 import com.tencent.aiaudio.wakeup.RecordDataManager;
 import com.tencent.utils.MusicPlayer;
 import com.tencent.utils.ThreadManager;
-import com.tencent.xiaowei.control.XWeiAudioFocusManager;
 import com.tencent.xiaowei.control.XWeiCommon;
 import com.tencent.xiaowei.control.XWeiControl;
 import com.tencent.xiaowei.def.XWCommonDef;
-import com.tencent.xiaowei.info.XWContextInfo;
+import com.tencent.xiaowei.info.XWRequestInfo;
 import com.tencent.xiaowei.info.XWResponseInfo;
 import com.tencent.xiaowei.sdk.XWDeviceBaseManager;
 import com.tencent.xiaowei.sdk.XWSDK;
@@ -55,6 +53,8 @@ import com.tencent.xiaowei.util.QLog;
 
 import java.io.File;
 import java.io.FileInputStream;
+
+import static com.tencent.xiaowei.def.XWCommonDef.REQUEST_PARAM.REQUEST_PARAM_USE_LOCAL_VAD;
 
 
 /**
@@ -93,7 +93,7 @@ public class AIAudioService extends Service {
     public static final String EXERESULT = "com.ktcp.voice.EXERESULT";
 
     static AIAudioService service;
-    private XWeiAudioFocusManager.OnAudioFocusChangeListener listener;
+    private AudioManager.OnAudioFocusChangeListener listener;
 
     public static AIAudioService getInstance() {
         return service;
@@ -129,8 +129,7 @@ public class AIAudioService extends Service {
                     bufferSizeInBytes);
         }
 
-        mAudioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
-        requestFocus();
+        mAudioManager = (AudioManager) getApplicationContext().getSystemService(Context.AUDIO_SERVICE);
 
         SharedPreferences sp = getSharedPreferences("wakeup", Context.MODE_PRIVATE);
         RecordDataManager.getInstance().setWakeupEnable(sp.getBoolean("use", true));
@@ -234,17 +233,19 @@ public class AIAudioService extends Service {
     }
 
     private void playTTS(String text) {
-        XWSDK.getInstance().requestTTS(text.getBytes(), new XWContextInfo(), new XWSDK.RequestListener() {
+
+        XWSDK.getInstance().requestTTS(text.getBytes(), new XWSDK.RequestListener() {
             @Override
             public boolean onRequest(int event, final XWResponseInfo rspData, byte[] extendData) {
-                listener = new XWeiAudioFocusManager.OnAudioFocusChangeListener() {
+                CommonApplication.mAudioManager.abandonAudioFocus(listener);
+                listener = new AudioManager.OnAudioFocusChangeListener() {
                     @Override
                     public void onAudioFocusChange(int focusChange) {
-                        if (focusChange == XWeiAudioFocusManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK) {
+                        if (focusChange == AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK) {
                             MusicPlayer.getInstance().playMediaInfo(rspData.resources[0].resources[0], new MusicPlayer.OnPlayListener() {
                                 @Override
                                 public void onCompletion(int error) {
-                                    XWeiAudioFocusManager.getInstance().abandonAudioFocus(listener);
+                                    CommonApplication.mAudioManager.abandonAudioFocus(listener);
                                 }
 
                             });
@@ -253,19 +254,13 @@ public class AIAudioService extends Service {
                         }
                     }
                 };
-                XWeiAudioFocusManager.getInstance().requestAudioFocus(listener, XWeiAudioFocusManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK);
+                int ret = CommonApplication.mAudioManager.requestAudioFocus(listener, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK);
+                if (ret == AudioManager.AUDIOFOCUS_REQUEST_GRANTED) {
+                    listener.onAudioFocusChange(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK);
+                }
                 return true;
             }
         });
-    }
-
-    private void requestFocus() {
-        if (XWeiAudioFocusManager.getInstance().needRequestFocus(AudioManager.AUDIOFOCUS_GAIN)) {
-            int ret = mAudioManager.requestAudioFocus(DemoOnAudioFocusChangeListener.getInstance(), AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN);
-            if (ret == AudioManager.AUDIOFOCUS_REQUEST_GRANTED) {
-                XWeiAudioFocusManager.getInstance().setAudioFocusChange(AudioManager.AUDIOFOCUS_GAIN);
-            }
-        }
     }
 
     // 只给查设备信息的长文本使用，让TTS能正确念出来这个格式
@@ -293,21 +288,21 @@ public class AIAudioService extends Service {
 
     private void wakeup() {
         Log.e(TAG, "context.voiceRequestBegin true wakup");
-        XWContextInfo contextInfo = new XWContextInfo();
+        XWRequestInfo requestInfo = new XWRequestInfo();
         if (localVad) {
-            contextInfo.requestParam |= XWContextInfo.REQUEST_PARAM_USE_LOCAL_VAD;
+            requestInfo.requestParam |= REQUEST_PARAM_USE_LOCAL_VAD;
         }
-        RecordDataManager.getInstance().onWakeup(contextInfo);
+        RecordDataManager.getInstance().onWakeup(requestInfo);
     }
 
     public void wakeup(String contextId, int speakTimeout, int silentTimeout, long requestParam) {
-        XWContextInfo contextInfo = new XWContextInfo();
-        contextInfo.ID = contextId;
-        contextInfo.silentTimeout = silentTimeout;
-        contextInfo.speakTimeout = speakTimeout;
-        contextInfo.requestParam = requestParam;
+        XWRequestInfo requestInfo = new XWRequestInfo();
+        requestInfo.contextId = contextId;
+        requestInfo.silentTimeout = silentTimeout;
+        requestInfo.speakTimeout = speakTimeout;
+        requestInfo.requestParam = requestParam;
 
-        RecordDataManager.getInstance().onWakeup(contextInfo);
+        RecordDataManager.getInstance().onWakeup(requestInfo);
     }
 
     public void setVolume(int value) {
@@ -424,7 +419,7 @@ public class AIAudioService extends Service {
         super.onDestroy();
         service = null;
         stopRecording();
-        mAudioManager.abandonAudioFocus(DemoOnAudioFocusChangeListener.getInstance());
+        mAudioManager.abandonAudioFocus(listener);
 
         if (android.os.Build.VERSION.SDK_INT >= 16 && AcousticEchoCanceler.isAvailable()) {
             if (canceler != null) {
@@ -450,7 +445,7 @@ public class AIAudioService extends Service {
 
         @Override
         public String startRequest(String text) throws RemoteException {
-            return XWSDK.getInstance().request(XWCommonDef.RequestType.TEXT, text.getBytes(), new XWContextInfo());
+            return XWSDK.getInstance().request(XWCommonDef.RequestType.TEXT, text.getBytes());
         }
 
         @Override

@@ -22,22 +22,22 @@
 // 文本类型的Media
 class CMediaText : public CMedia
 {
-  public:
-    void Init(const char *content, const char *description, unsigned int play_count);
-    void Init(MEDIA_TYPE type, const char *content);
-    void Update(MEDIA_TYPE type);
+public:
+  void Init(const char *content, const char *description, unsigned int play_count);
+  void Init(MEDIA_TYPE type, const char *content);
+  void Update(MEDIA_TYPE type);
 
-    //  见 txc_media_read() 声明
-    virtual int Read(_Out_ const void **data, _Out_ size_t *data_size, _In_ size_t offset);
+  //  见 txc_media_read() 声明
+  virtual int Read(_Out_ const void **data, _Out_ size_t *data_size, _In_ size_t offset);
 
-  protected:
-    CMediaText(const std::string &res_id);
+protected:
+  CMediaText(const std::string &res_id);
 
-  private:
-    friend class TXCMediaCenter;
+private:
+  friend class TXCMediaCenter;
 
-  private:
-    bool inited_;
+private:
+  bool inited_;
 };
 
 #endif /* MediaText_hpp */

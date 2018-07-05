@@ -18,7 +18,7 @@
 #define __TX_CLOUD_AUDIO_RESOURCE_H__
 
 #include "TXCAudioType.h"
-
+// 音乐等资源相关的接口
 CXX_EXTERN_BEGIN
 
 /**

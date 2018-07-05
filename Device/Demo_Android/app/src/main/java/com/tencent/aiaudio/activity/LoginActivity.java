@@ -60,7 +60,7 @@ public class LoginActivity extends Activity {
     private ImageView mIv;
     private TextView mTv;
     private boolean needRetry;
-    private boolean isFirst = true;
+    private static boolean isFirst = true;
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
@@ -73,10 +73,11 @@ public class LoginActivity extends Activity {
                 return;
             }
         }
-        if (CommonApplication.isLogined) {
+        if (CommonApplication.isLogined && !isFirst) {
             gotoMain();
             return;
         }
+        isFirst = false;
         setContentView(R.layout.activity_login);
 
         final Button btnEnv = (Button) findViewById(R.id.btn_test_env);

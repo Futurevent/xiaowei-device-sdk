@@ -111,7 +111,6 @@ public class BaseActivity extends FragmentActivity {
 
     @Override
     protected void onDestroy() {
-        ActivityManager.getInstance().remove(sessionId);
         super.onDestroy();
     }
 

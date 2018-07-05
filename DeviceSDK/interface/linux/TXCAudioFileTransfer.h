@@ -146,15 +146,14 @@ SDK_API int txca_init_file_transfer(TXCA_FILE_TRANSFER_NOTIFY notify, char *path
 SDK_API int txca_upload_file(int channel_type, int file_type, char *file_path, unsigned long long *transfer_cookie);
 
 /**
-* 下载文件
-* channeltype : 传输通道类型，取值范围见TXCA_FILE_TRANSFER_CHANNELTYPE。
-* filetype : 传输文件类型，取值范围见TXCA_FILE_TRANSFER_FILETYPE
-* file_key：要下载的文件的key
-* key_length：file_key的长度
-* mini_token是手机QQ 6.3开始引入的一种文件安全校验码，如果收到的文件信息里有mini_token请带上这个字段。
-* mini_token如果不为空，SDK会检查文件的完整性和合法性，避免传输文件在DNS挟持攻击下被篡改或者文件下载不完整时即被交给UI层处理的问题
-* transfer_cookie：返回任务cookie
-*/
+ * 下载文件
+ * channeltype：传输通道类型，取值范围见TXCA_FILE_TRANSFER_CHANNELTYPE。
+ * filetype：传输文件类型，取值范围见TXCA_FILE_TRANSFER_FILETYPE
+ * file_key：要下载的文件的key
+ * key_length：file_key的长度
+ * mini_token：文件安全校验码
+ * transfer_cookie：返回任务cookie
+ */
 SDK_API int txca_download_file(int channel_type, int file_type, char *file_key, int key_length, const char *mini_token, unsigned long long *transfer_cookie);
 
 /**

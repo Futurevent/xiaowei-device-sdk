@@ -38,7 +38,11 @@ struct txc_playlist_t
     int playlist_id; // 播放列表id
     int type;
     int count;       // 播放列表资源数
-    bool hasMore;    // 列表资源是否有更多
+    bool has_more_current;    // 当前列表往下有更多
+    bool has_more_current_up;    // 当前列表往上有更多
+    bool has_more_history;    // 历史列表往下有更多
+    bool has_more_history_up;    // 历史列表往上有更多
+    bool has_history;    // 有历史列表
 };
 
 /**

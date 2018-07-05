@@ -17,9 +17,9 @@
 package com.tencent.aiaudio.utils;
 
 import android.media.AudioManager;
-import android.util.Log;
 
 import com.tencent.xiaowei.control.XWeiAudioFocusManager;
+import com.tencent.xiaowei.util.QLog;
 
 public class DemoOnAudioFocusChangeListener implements AudioManager.OnAudioFocusChangeListener {
 
@@ -27,7 +27,12 @@ public class DemoOnAudioFocusChangeListener implements AudioManager.OnAudioFocus
 
     public static DemoOnAudioFocusChangeListener getInstance() {
         // 这里单例可能触发系统的bug，所以每次创建一个，在回调的时候进行判断
+//        if (listener == null)
         listener = new DemoOnAudioFocusChangeListener();
+        return listener;
+    }
+
+    public static DemoOnAudioFocusChangeListener getLastInstance() {
         return listener;
     }
 

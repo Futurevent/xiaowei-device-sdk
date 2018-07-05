@@ -18,6 +18,8 @@
 #include "Util.hpp"
 #include <sstream>
 #include <map>
+#include <sys/time.h>
+
 static int last_pid_ = 0;
 static std::map<XWM_EVENT, std::string> XWM_EVENT_MAP;
 static std::map<DURATION_HINT, std::string> DURATION_HINT_MAP;
@@ -25,9 +27,18 @@ static std::map<TXC_PLAYER_ACTION, std::string> TXC_PLAYER_ACTION_MAP;
 static std::map<TXC_PLAYER_STATE, std::string> TXC_PLAYER_STATE_MAP;
 static std::map<player_control, std::string> player_control_MAP;
 
+unsigned long long Util::GetCurTimeMsLocal()
+{
+    time_t tm = time(NULL);
+    struct timeval tpend;
+    gettimeofday(&tpend, NULL);
+
+    return ((unsigned long long)tm) * 1000 + tpend.tv_usec / 1000;
+}
+
 bool Util::IsInvaild(const TXCA_PARAM_RESPONSE &cRsp)
 {
-     return (!cRsp.skill_info.id && !cRsp.skill_info.name && !cRsp.last_skill_info.id && !cRsp.last_skill_info.name && cRsp.resource_groups_size == 0 && cRsp.context.speak_timeout == 0);
+    return (!cRsp.skill_info.id && !cRsp.skill_info.name && !cRsp.last_skill_info.id && !cRsp.last_skill_info.name && cRsp.resource_groups_size == 0 && cRsp.context.speak_timeout == 0);
 }
 
 bool Util::IsVaild(const TXCA_PARAM_RESPONSE &cRsp)
@@ -44,8 +55,8 @@ bool Util::IsTempRsp(const TXCA_PARAM_RESPONSE &cRsp)
 
 bool Util::IsCommandRsp(const TXCA_PARAM_RESPONSE &cRsp)
 {
-    std::string skill_name = cRsp.skill_info.name ?  cRsp.skill_info.name : "";
-    return  skill_name.find("通用控制") != std::string::npos && cRsp.resource_groups_size > 0 &&  cRsp.resource_groups[0].resources_size > 0 &&  cRsp.resource_groups[0].resources[0].format == txca_resource_command;
+    std::string skill_name = cRsp.skill_info.name ? cRsp.skill_info.name : "";
+    return skill_name.find("通用控制") != std::string::npos && cRsp.resource_groups_size > 0 && cRsp.resource_groups[0].resources_size > 0 && cRsp.resource_groups[0].resources[0].format == txca_resource_command;
 }
 
 int Util::GetNewProcessId()
@@ -94,15 +105,14 @@ std::string Util::ToString(const TXCA_PARAM_RESPONSE &cRsp)
     return ss.str();
 }
 
-
 std::string Util::ToString(XWM_EVENT e)
 {
-    if(XWM_EVENT_MAP.size() == 0) {
+    if (XWM_EVENT_MAP.size() == 0)
+    {
         XWM_EVENT_MAP[XWM_NULL] = "XWM_NULL";
         XWM_EVENT_MAP[XWM_SUPPLEMENT_REQUEST] = "XWM_SUPPLEMENT_REQUEST";
         XWM_EVENT_MAP[XWM_ERROR_RESPONSE] = "XWM_ERROR_RESPONSE";
         XWM_EVENT_MAP[XWM_RESPONSE_DATA] = "XWM_RESPONSE_DATA";
-        XWM_EVENT_MAP[XWM_SILENT] = "XWM_SILENT";
         XWM_EVENT_MAP[XWM_BEGIN_PLAYER_CONTROL] = "XWM_BEGIN_PLAYER_CONTROL";
         XWM_EVENT_MAP[XWM_STOP] = "XWM_STOP";
         XWM_EVENT_MAP[XWM_PLAY] = "XWM_PLAY";
@@ -120,16 +130,17 @@ std::string Util::ToString(XWM_EVENT e)
         XWM_EVENT_MAP[XWM_BEGIN_MEDIA] = "XWM_BEGIN_MEDIA";
         XWM_EVENT_MAP[XWM_ALBUM_ADDED] = "XWM_ALBUM_ADDED";
         XWM_EVENT_MAP[XWM_LIST_ADDED] = "XWM_LIST_ADDED";
+        XWM_EVENT_MAP[XWM_LIST_HISTORY_ADDED] = "XWM_LIST_HISTORY_ADDED";
         XWM_EVENT_MAP[XWM_LIST_REMOVED] = "XWM_LIST_REMOVED";
         XWM_EVENT_MAP[XWM_LIST_UPDATED] = "XWM_LIST_UPDATED";
         XWM_EVENT_MAP[XWM_MEDIA_ADDED] = "XWM_MEDIA_ADDED";
         XWM_EVENT_MAP[XWM_MEDIA_REMOVED] = "XWM_MEDIA_REMOVED";
         XWM_EVENT_MAP[XWM_PROGRESS] = "XWM_PROGRESS";
         XWM_EVENT_MAP[XWM_MEDIA_UPDATE] = "XWM_MEDIA_UPDATE";
+        XWM_EVENT_MAP[XWM_GET_MORE_LIST] = "XWM_GET_MORE_LIST";
         XWM_EVENT_MAP[XWM_BEGIN_UI_FEEDBACK] = "XWM_BEGIN_UI_FEEDBACK";
         XWM_EVENT_MAP[XWM_PLAYER_STATUS_CHANGED] = "XWM_PLAYER_STATUS_CHANGED";
         XWM_EVENT_MAP[XWM_PLAYER_STATUS_FINISH] = "XWM_PLAYER_STATUS_FINISH";
-        XWM_EVENT_MAP[XWM_IM_MSG] = "XWM_IM_MSG";
         XWM_EVENT_MAP[XWM_SYSTEM] = "XWM_SYSTEM";
         XWM_EVENT_MAP[XWM_USER] = "XWM_USER";
     }
@@ -138,7 +149,8 @@ std::string Util::ToString(XWM_EVENT e)
 
 std::string Util::ToString(DURATION_HINT e)
 {
-    if(DURATION_HINT_MAP.size() == 0) {
+    if (DURATION_HINT_MAP.size() == 0)
+    {
         DURATION_HINT_MAP[AUDIOFOCUS_GAIN] = "AUDIOFOCUS_GAIN";
         DURATION_HINT_MAP[AUDIOFOCUS_GAIN_TRANSIENT] = "AUDIOFOCUS_GAIN_TRANSIENT";
         DURATION_HINT_MAP[AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK] = "AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK";
@@ -150,8 +162,10 @@ std::string Util::ToString(DURATION_HINT e)
     return DURATION_HINT_MAP[e];
 }
 
-std::string Util::ToString(TXC_PLAYER_ACTION e){
-    if(TXC_PLAYER_ACTION_MAP.size() == 0) {
+std::string Util::ToString(TXC_PLAYER_ACTION e)
+{
+    if (TXC_PLAYER_ACTION_MAP.size() == 0)
+    {
         TXC_PLAYER_ACTION_MAP[ACT_NULL] = "ACT_NULL";
         TXC_PLAYER_ACTION_MAP[ACT_MUSIC_PUSH_MEDIA] = "ACT_MUSIC_PUSH_MEDIA";
         TXC_PLAYER_ACTION_MAP[ACT_ADD_ALBUM] = "ACT_ADD_ALBUM";
@@ -159,6 +173,8 @@ std::string Util::ToString(TXC_PLAYER_ACTION e){
         TXC_PLAYER_ACTION_MAP[ACT_PLAYLIST_ADD_ITEM_FRONT] = "ACT_PLAYLIST_ADD_ITEM_FRONT";
         TXC_PLAYER_ACTION_MAP[ACT_PLAYLIST_REMOVE_ITEM] = "ACT_PLAYLIST_REMOVE_ITEM";
         TXC_PLAYER_ACTION_MAP[ACT_PLAYLIST_UPDATE_ITEM] = "ACT_PLAYLIST_UPDATE_ITEM";
+        TXC_PLAYER_ACTION_MAP[ACT_PLAYLIST_HISTORY_ADD_ITEM] = "ACT_PLAYLIST_HISTORY_ADD_ITEM";
+        TXC_PLAYER_ACTION_MAP[ACT_PLAYLIST_HISTORY_ADD_ITEM_FRONT] = "ACT_PLAYLIST_HISTORY_ADD_ITEM_FRONT";
         TXC_PLAYER_ACTION_MAP[ACT_PLAYER_STOP] = "ACT_PLAYER_STOP";
         TXC_PLAYER_ACTION_MAP[ACT_PLAYER_PAUSE] = "ACT_PLAYER_PAUSE";
         TXC_PLAYER_ACTION_MAP[ACT_PLAYER_SET_REPEAT_MODE] = "ACT_PLAYER_SET_REPEAT_MODE";
@@ -169,15 +185,15 @@ std::string Util::ToString(TXC_PLAYER_ACTION e){
         TXC_PLAYER_ACTION_MAP[ACT_NEED_TIPS] = "ACT_NEED_TIPS";
         TXC_PLAYER_ACTION_MAP[ACT_CHANGE_VOLUME] = "ACT_CHANGE_VOLUME";
         TXC_PLAYER_ACTION_MAP[ACT_REPORT_PLAY_STATE] = "ACT_REPORT_PLAY_STATE";
-        TXC_PLAYER_ACTION_MAP[ACT_DOWNLOAD_MSG] = "ACT_DOWNLOAD_MSG";
-        TXC_PLAYER_ACTION_MAP[ACT_AUDIOMSG_RECORD] = "ACT_AUDIOMSG_RECORD";
-        TXC_PLAYER_ACTION_MAP[ACT_AUDIOMSG_SEND] = "ACT_AUDIOMSG_SEND";
+        TXC_PLAYER_ACTION_MAP[ACT_NEED_GET_MORE_LIST] = "ACT_NEED_GET_MORE_LIST";
     }
     return TXC_PLAYER_ACTION_MAP[e];
 }
 
-std::string Util::ToString(TXC_PLAYER_STATE e){
-    if(TXC_PLAYER_STATE_MAP.size() == 0) {
+std::string Util::ToString(TXC_PLAYER_STATE e)
+{
+    if (TXC_PLAYER_STATE_MAP.size() == 0)
+    {
         TXC_PLAYER_STATE_MAP[TXC_PLAYER_STATE_START] = "TXC_PLAYER_STATE_START";
         TXC_PLAYER_STATE_MAP[TXC_PLAYER_STATE_STOP] = "TXC_PLAYER_STATE_STOP";
         TXC_PLAYER_STATE_MAP[TXC_PLAYER_STATE_COMPLETE] = "TXC_PLAYER_STATE_COMPLETE";
@@ -190,7 +206,8 @@ std::string Util::ToString(TXC_PLAYER_STATE e){
 
 std::string Util::ToString(player_control e)
 {
-    if(player_control_MAP.size() == 0) {
+    if (player_control_MAP.size() == 0)
+    {
         player_control_MAP[PLAYER_CONTROL_NULL] = "PLAYER_CONTROL_NULL";
         player_control_MAP[PLAYER_BEGIN_PLAYER_CONTROL] = "PLAYER_BEGIN_PLAYER_CONTROL";
         player_control_MAP[PLAYER_STOP] = "PLAYER_STOP";
@@ -204,4 +221,20 @@ std::string Util::ToString(player_control e)
         player_control_MAP[PLAYER_SKIP] = "PLAYER_SKIP";
     }
     return player_control_MAP[e];
+}
+
+std::string Util::ToString(txc_playlist_t t)
+{
+    std::stringstream ss;
+    ss<< "has_history=";
+    ss<< t.has_history;
+    ss<< ",has_more_current=";
+    ss<< t.has_more_current;
+    ss<< ",has_more_current_up=";
+    ss<< t.has_more_current_up;
+    ss<< ",has_more_history=";
+    ss<< t.has_more_history;
+    ss<< ",has_more_history_up=";
+    ss<< t.has_more_history_up;
+    return ss.str();
 }

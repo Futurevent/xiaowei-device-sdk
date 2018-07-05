@@ -22,7 +22,7 @@ import android.os.Parcelable;
 import com.tencent.xiaowei.util.JsonUtil;
 
 /**
- * C2C消息结构定义
+ * C2C消息结构定义，用来和小微App交互
  */
 public class XWCCMsgInfo implements Parcelable {
 

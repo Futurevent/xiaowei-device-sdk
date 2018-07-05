@@ -16,9 +16,11 @@
  */
 package com.tencent.xiaowei.sdk;
 
+import android.content.Context;
 import android.support.v4.util.LongSparseArray;
 
 import com.tencent.xiaowei.info.XWCCMsgInfo;
+import com.tencent.xiaowei.info.XWLoginInfo;
 import com.tencent.xiaowei.util.QLog;
 
 /**
@@ -60,10 +62,11 @@ public class XWCCMsgManager {
     }
 
     /**
-     * 初始化c2c消息模块
+     * 初始化c2c消息模块 use{@link XWSDK#login(Context, XWLoginInfo, XWSDK.OnXWLoginListener)} instead.
      *
      * @return errCode 结果码
      */
+    @Deprecated
     public static int initC2CMsgModule() {
         return XWSDKJNI.initCCMsgModule();
     }

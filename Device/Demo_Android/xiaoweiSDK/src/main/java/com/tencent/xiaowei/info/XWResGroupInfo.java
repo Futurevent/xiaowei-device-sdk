@@ -64,4 +64,8 @@ public class XWResGroupInfo implements Parcelable {
     public String toString() {
         return JsonUtil.toJson(this);
     }
+
+    public class CmdRsp {
+        public XWResourceInfo.CmdRsp[] resources;
+    }
 }

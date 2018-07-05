@@ -48,7 +48,7 @@ jclass s_clsAudioAccount = NULL;
 jclass s_clsLoaction = NULL;
 jclass s_clsAudioAppInfo = NULL;
 jclass s_clsAudioContext = NULL;
-jclass s_clsAudioDeviceInfo = NULL;
+jclass s_clsAudioRequestParam = NULL;
 jclass s_clsAudioResource = NULL;
 jclass s_clsAudioResGroup = NULL;
 jclass s_clsAudioResponse = NULL;
@@ -192,7 +192,7 @@ extern void on_binder_list_change(int error, TX_BINDER_INFO *pBinderList, int nC
 extern void on_binder_remark_change_callback(int cookie, TX_BINDER_REMARK_INFO * pBinderRemarkList, int nCount);
 extern void on_wlan_upload_register_info_success(int errcode);
 extern void on_connected_server(int error_code);
-extern void on_register(int error_code, int sub_error_code);
+extern void on_register(int error_code, int sub_error_code, unsigned long long din);
 
 extern void on_receive_video_push(char * pBuf, int uLen, unsigned long long sendUin, int sendUinType);
 
@@ -272,8 +272,8 @@ Java_com_tencent_xiaowei_sdk_XWSDKJNI_initJNI(JNIEnv *env, jobject service, jint
         s_clsAudioAppInfo = (jclass) env->NewGlobalRef(clsAudioAppInfo);
         jclass clsAudioContext = env->FindClass("com/tencent/xiaowei/info/XWContextInfo");
         s_clsAudioContext = (jclass) env->NewGlobalRef(clsAudioContext);
-        jclass clsAudioDeviceInfo = env->FindClass("com/tencent/xiaowei/info/XWDeviceInfo");
-        s_clsAudioDeviceInfo = (jclass) env->NewGlobalRef(clsAudioDeviceInfo);
+        jclass clsAudioRequest = env->FindClass("com/tencent/xiaowei/info/XWRequestInfo");
+        s_clsAudioRequestParam = (jclass) env->NewGlobalRef(clsAudioRequest);
         jclass clsAudioResource = env->FindClass("com/tencent/xiaowei/info/XWResourceInfo");
         s_clsAudioResource = (jclass) env->NewGlobalRef(clsAudioResource);
         jclass clsAudioResGroup = env->FindClass("com/tencent/xiaowei/info/XWResGroupInfo");
@@ -388,20 +388,21 @@ JNIEXPORT jint JNICALL Java_com_tencent_xiaowei_sdk_XWSDKJNI_init
         __android_log_print(ANDROID_LOG_INFO, LOGFILTER, "tx_init_device success\n");
 
         //初始化传文件通道
+        #ifndef NO_FILE_TRANSFER
         TXCA_FILE_TRANSFER_NOTIFY file_notify = {0};
         file_notify.on_transfer_progress = on_transfer_progress;
         file_notify.on_transfer_complete = on_transfer_complete;
         txca_init_file_transfer(file_notify, (char *) tmp_path);
 
         txca_set_auto_download_callbak(on_auto_download_callback);
-    } else {
-        __android_log_print(ANDROID_LOG_INFO, LOGFILTER, "tx_init_device failed [%d]\n", ret);
-    }
+        #endif
 
-    if (err_null == ret) {
         TX_OTA_RESULT result = {0};
         result.on_ota_result = on_ota_info;
         tx_config_ota(&result);
+
+    } else {
+        __android_log_print(ANDROID_LOG_INFO, LOGFILTER, "tx_init_device failed [%d]\n", ret);
     }
 
     env->ReleaseStringUTFChars(strDeviceName, device_name);
@@ -433,7 +434,7 @@ Java_com_tencent_xiaowei_sdk_XWSDKJNI_deviceReconnect(JNIEnv *env, jobject servi
  * @param service
  * @return
  */
-JNIEXPORT jint JNICALL
+JNIEXPORT jlong JNICALL
 Java_com_tencent_xiaowei_sdk_XWSDKJNI_getServerTime(JNIEnv *env, jobject service) {
     return tx_get_server_time();
 }

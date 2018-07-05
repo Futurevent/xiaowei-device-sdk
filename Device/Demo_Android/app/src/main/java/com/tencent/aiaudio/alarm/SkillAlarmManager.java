@@ -26,8 +26,7 @@ import android.os.Build.VERSION;
 import android.os.Build.VERSION_CODES;
 import android.text.TextUtils;
 
-import com.tencent.aiaudio.activity.Alarm2Activity;
-import com.tencent.aiaudio.activity.AlarmActivity;
+import com.tencent.aiaudio.activity.TriggerAlarmActivity;
 import com.tencent.aiaudio.chat.AVChatManager;
 import com.tencent.xiaowei.control.XWeiControl;
 import com.tencent.xiaowei.def.XWCommonDef;
@@ -36,8 +35,6 @@ import com.tencent.xiaowei.sdk.XWDeviceBaseManager;
 import com.tencent.xiaowei.sdk.XWSDK;
 import com.tencent.xiaowei.util.JsonUtil;
 import com.tencent.xiaowei.util.QLog;
-
-import org.xutils.x;
 
 import java.util.ArrayList;
 import java.util.Calendar;
@@ -100,7 +97,6 @@ public class SkillAlarmManager implements ISkillAlarmManager, OnQueryAllAlarmLis
     @Override
     public void init(Application application) {
         this.mApplication = application;
-        x.Ext.init(application);
     }
 
     @Override
@@ -167,24 +163,20 @@ public class SkillAlarmManager implements ISkillAlarmManager, OnQueryAllAlarmLis
     @Override
     public void updateAlarmList() {
         QLog.d(TAG, "updateAlarmList() update alarm list with server alarm list");
-
-        XWSDK.getInstance().getDeviceAlarmList(new XWSDK.GetAlarmListRspListener() {
+        XWSDK.getInstance().request("ALARM", "get_list", "", new XWSDK.OnRspListener() {
             @Override
-            public void onGetAlarmList(int errCode, String strVoiceID, String[] arrayAlarmList) {
-                if (errCode == XWCommonDef.ErrorCode.ERROR_NULL_SUCC) {
-
-                    if (arrayAlarmList == null) {
+            public void onRsp(String voiceId, int error, String json) {
+                if (error == XWCommonDef.ErrorCode.ERROR_NULL_SUCC) {
+                    ClockListBean listBean = JsonUtil.getObject(json, ClockListBean.class);
+                    if (listBean.getClock_info() == null) {
                         QLog.d(TAG, "getDeviceAlarmList() array == null.");
-                        return;
                     }
 
-
-                    QLog.d(TAG, String.format("operationAlarmSkill size=%s", arrayAlarmList.length));
+                    QLog.d(TAG, String.format("operationAlarmSkill size=%s", listBean.getClock_info().size()));
 
                     List<SkillAlarmBean> deletedAlarmList = getAlarmList();  // 云端已经删除的闹钟列表：先获取本地的闹钟列表，再根据云端列表去比较
 
-                    for (String strClockInfo : arrayAlarmList) {
-                        ClockListBean.ClockInfoBean clockInfo = JsonUtil.getObject(strClockInfo, ClockListBean.ClockInfoBean.class);
+                    for (ClockListBean.ClockInfoBean clockInfo : listBean.getClock_info()) {
                         if (clockInfo == null) {
                             continue;
                         }
@@ -193,7 +185,7 @@ public class SkillAlarmManager implements ISkillAlarmManager, OnQueryAllAlarmLis
                         alarmBean.setKey(clockInfo.getClock_id());
                         alarmBean.setEvent(clockInfo.getEvent());
                         alarmBean.setAlarmTime(Long.valueOf(clockInfo.getTrig_time()) * 1000L);
-                        alarmBean.setServerTime(XWDeviceBaseManager.getServerTime() * 1000L);
+                        alarmBean.setServerTime(XWDeviceBaseManager.getServerTime());
                         QLog.d(TAG, String.format("serverTime:%s, currentTime=%s",
                                 alarmBean.getServerTime(), System.currentTimeMillis()));
                         alarmBean.setServerTimeDifference(alarmBean.getServerTime() - System.currentTimeMillis());
@@ -240,7 +232,7 @@ public class SkillAlarmManager implements ISkillAlarmManager, OnQueryAllAlarmLis
         if (mDelayAlarmList.size() > 0) {
             ArrayList<SkillAlarmBean> beans = new ArrayList<>(mDelayAlarmList);
             // 打开闹钟Activity
-            Intent intent1 = new Intent(mApplication.getApplicationContext(), AlarmActivity.class);
+            Intent intent1 = new Intent(mApplication.getApplicationContext(), TriggerAlarmActivity.class);
             intent1.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             intent1.putExtra("alarms", beans);
             mApplication.getApplicationContext().startActivity(intent1);
@@ -568,7 +560,7 @@ public class SkillAlarmManager implements ISkillAlarmManager, OnQueryAllAlarmLis
          */
         public static final int START_ALARM_UPDATE_TIME = 2;
 
-        public static OnObtainAlarmResource mOnObtainAlarmResource;
+        public static OnObtainAlarmResource mOnObtainAlarmResource = null;
 
         @Override
         public void onReceive(Context context, Intent intent) {
@@ -584,6 +576,11 @@ public class SkillAlarmManager implements ISkillAlarmManager, OnQueryAllAlarmLis
 
             if (key == -1) {
                 QLog.d(TAG, "onReceive() key == -1");
+                return;
+            }
+
+            if (mOnObtainAlarmResource == null) {
+                QLog.d(TAG, "mOnObtainAlarmResource == null");
                 return;
             }
 
@@ -609,12 +606,13 @@ public class SkillAlarmManager implements ISkillAlarmManager, OnQueryAllAlarmLis
             }
 
             if (bean.isTimingPlaySkill()) {
-                XWSDK.getInstance().getTimingSkillResource(bean.getKey(), new XWSDK.RequestListener() {
+                XWSDK.getInstance().request("ALARM", "get_timing_task", "{\"clock_id\":" + bean.getKey() + "}", new XWSDK.OnRspListener() {
                     @Override
-                    public boolean onRequest(int event, XWResponseInfo rspData, byte[] extendData) {
+                    public void onRsp(String voiceId, int error, String json) {
                         // 由控制层处理播放资源
-                        XWeiControl.getInstance().processResponse(rspData.voiceID, rspData, extendData);
-                        return true;
+                        XWResponseInfo rspData = XWResponseInfo.fromCmdJson(json);
+                        if (rspData.resources != null && rspData.resources.length > 0)
+                            XWeiControl.getInstance().processResponse(voiceId, rspData, null);
                     }
                 });
             } else {
@@ -625,7 +623,7 @@ public class SkillAlarmManager implements ISkillAlarmManager, OnQueryAllAlarmLis
                     // 打开闹钟Activity
                     ArrayList<SkillAlarmBean> beans = new ArrayList<>();
                     beans.add(bean);
-                    Intent intent1 = new Intent(context, AlarmActivity.class);
+                    Intent intent1 = new Intent(context, TriggerAlarmActivity.class);
                     intent1.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                     intent1.putExtra("alarms", beans);
                     context.startActivity(intent1);

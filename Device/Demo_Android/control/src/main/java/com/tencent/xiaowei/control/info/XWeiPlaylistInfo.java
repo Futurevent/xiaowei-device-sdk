@@ -38,15 +38,54 @@ public class XWeiPlaylistInfo implements Parcelable {
      */
     public int count;
     /**
-     * 是否还有更多资源
+     * 当前列表往下有更多
      */
-    public boolean hasMore;
+    public boolean hasMoreCurrent;
+    /**
+     * 当前列表往上有更多
+     */
+    public boolean hasMoreCurrentUp;
+    /**
+     * 历史列表往下有更多，并非每个Skill都有历史
+     */
+    public boolean hasMoreHistory;
+    /**
+     * 历史列表往上有更多，并非每个Skill都有历史
+     */
+    public boolean hasMoreHistoryUp;
+
+    /**
+     * 存在历史列表
+     */
+    public boolean hasHistory;
+
 
     protected XWeiPlaylistInfo(Parcel in) {
         playlistId = in.readInt();
         type = in.readInt();
         count = in.readInt();
-        hasMore = in.readByte() != 0;
+        hasMoreCurrent = in.readByte() != 0;
+        hasMoreCurrentUp = in.readByte() != 0;
+        hasMoreHistory = in.readByte() != 0;
+        hasMoreHistoryUp = in.readByte() != 0;
+        hasHistory = in.readByte() != 0;
+    }
+
+    @Override
+    public void writeToParcel(Parcel dest, int flags) {
+        dest.writeInt(playlistId);
+        dest.writeInt(type);
+        dest.writeInt(count);
+        dest.writeByte((byte) (hasMoreCurrent ? 1 : 0));
+        dest.writeByte((byte) (hasMoreCurrentUp ? 1 : 0));
+        dest.writeByte((byte) (hasMoreHistory ? 1 : 0));
+        dest.writeByte((byte) (hasMoreHistoryUp ? 1 : 0));
+        dest.writeByte((byte) (hasHistory ? 1 : 0));
+    }
+
+    @Override
+    public int describeContents() {
+        return 0;
     }
 
     public static final Creator<XWeiPlaylistInfo> CREATOR = new Creator<XWeiPlaylistInfo>() {
@@ -60,19 +99,6 @@ public class XWeiPlaylistInfo implements Parcelable {
             return new XWeiPlaylistInfo[size];
         }
     };
-
-    @Override
-    public int describeContents() {
-        return 0;
-    }
-
-    @Override
-    public void writeToParcel(Parcel dest, int flags) {
-        dest.writeInt(playlistId);
-        dest.writeInt(type);
-        dest.writeInt(count);
-        dest.writeByte((byte) (hasMore ? 1 : 0));
-    }
 
     @Override
     public String toString() {

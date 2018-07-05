@@ -22,22 +22,21 @@
 #include <stdarg.h>
 #include "TXCAudioType.h"
 #include "Player.h"
-#include "TXCAudioFileTransfer.h"
 
 CXX_EXTERN_BEGIN
 
 // receive events @ message thread
-// 消息类型定义
+// 控制层内部消息类型定义
 typedef enum xwm_event {
     XWM_NULL = 0,
 
     XWM_SUPPLEMENT_REQUEST, // arg1: speak_timeout; response   = (const TXCA_PARAM_RESPONSE*)(arg2);
     XWM_ERROR_RESPONSE,     // arg1: error_code; response   = (const TXCA_PARAM_RESPONSE*)(arg2);
     XWM_RESPONSE_DATA,      // arg1:
-    XWM_SILENT,             // arg1:
 
     XWM_BEGIN_PLAYER_CONTROL = 0x100,
     XWM_STOP,
+    XWM_START,    //  arg1: index
     XWM_PLAY,    //  arg1: index
     XWM_PAUSE,   //  arg1: 1 for pause, 0 for resume
     XWM_VOLUME,  //  arg1: value of volume
@@ -53,10 +52,12 @@ typedef enum xwm_event {
     XWM_REQUEST_AUDIO_FOCUS, //arg1: (int)SESSIONID ,arg2:duration
     XWM_ABANDON_AUDIO_FOCUS, //arg1: (bool) all
     XWM_SET_AUDIO_FOCUS,     //arg1: (DURATION_HINT) focus
+    XWM_SET_AUDIO_FOCUS_INTERFACE_CHANGE,     // arg1: (int)cookie ,arg2:: (DURATION_HINT) focus
 
     XWM_BEGIN_MEDIA = 0x300,
     XWM_ALBUM_ADDED,   // arg1: media index of album description;
     XWM_LIST_ADDED,    // arg1: start item index; arg2: added item count
+    XWM_LIST_HISTORY_ADDED,    // arg1: start item index; arg2: added item count
     XWM_LIST_REMOVED,  // arg1: start item index; arg2: end item index
     XWM_LIST_UPDATED,  // arg1: start item index; arg2: updated item count
     XWM_MEDIA_ADDED,   // arg1: start item index; arg2: added item count
@@ -64,17 +65,22 @@ typedef enum xwm_event {
 
     XWM_PROGRESS,     // progress = reinterpret_cast<const txc_progress_t *>(arg1)
     XWM_MEDIA_UPDATE, //  arg1: const char *res_id
+    XWM_GET_MORE_LIST,   // arg1: XWM_GET_MORE_LIST_TYPE arg2:current_list_type
 
     XWM_BEGIN_UI_FEEDBACK = 0x400,
     XWM_PLAYER_STATUS_CHANGED, // arg1: tx_ai_audio_player_state
     XWM_PLAYER_STATUS_FINISH,
 
-    XWM_IM_MSG = 0x900,
-
     XWM_SYSTEM = 0X1000,
 
     XWM_USER = 0X2000,
 } XWM_EVENT;
+
+typedef enum XWM_GetMoreListType {
+    TYPE_GET_HISTORY = 0,
+    TYPE_GET_MORE_UP = 1,
+    TYPE_GET_MORE = 2,
+} XWM_GET_MORE_LIST_TYPE;
 
 // 场景信息结构体定义
 struct txc_session_info
@@ -146,24 +152,6 @@ SDK_API int txc_list_sessions(_Out_ SESSION *sessions, int buffer_count);
  * @return txc_session_info 场景信息
  */
 SDK_API const txc_session_info *txc_get_session(SESSION id);
-
-// 消息结构体定义
-struct txc_msg_info
-{
-    unsigned long long tinyId;  // 消息来源id
-    int type;                // 类型
-    const char* content;      // 内容
-    int duration;            // 时长
-    int timestamp;           // 时间戳
-    bool isRecv;             // 是否接收
-};
-
-/**
- * 接口说明：添加下载完成的消息到消息盒子
- *
- * @param msgInfo 消息体
- */
-SDK_API void txc_xwei_msgbox_addmsg(txc_msg_info* msgInfo);
 
 // 消息处理回调函数定义
 typedef bool (*txc_event_processor)(SESSION id, XWM_EVENT event, XWPARAM arg1, XWPARAM arg2);

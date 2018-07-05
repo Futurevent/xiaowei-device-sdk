@@ -69,5 +69,5 @@ public class XWeiMedia {
      * @param index      获取资源的索引
      * @return 资源信息
      */
-    public native XWeiMediaInfo txcGetMedia(int playlistId, long index);
+    public native XWeiMediaInfo txcGetMedia(int sessionId, long index);
 }

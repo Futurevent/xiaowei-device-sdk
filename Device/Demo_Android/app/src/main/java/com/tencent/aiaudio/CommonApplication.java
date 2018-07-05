@@ -21,10 +21,10 @@ import android.app.Application;
 import android.bluetooth.BluetoothAdapter;
 import android.content.Context;
 import android.content.Intent;
+import android.media.AudioManager;
 import android.os.Bundle;
 import android.os.Environment;
 import android.os.Handler;
-import android.text.TextUtils;
 import android.widget.Toast;
 
 import com.tencent.aiaudio.bledemo.BLEManager;
@@ -49,10 +49,10 @@ import com.tencent.xiaowei.info.XWCCMsgInfo;
 import com.tencent.xiaowei.info.XWLoginInfo;
 import com.tencent.xiaowei.info.XWTTSDataInfo;
 import com.tencent.xiaowei.sdk.XWCCMsgManager;
-import com.tencent.xiaowei.sdk.XWCoreService;
-import com.tencent.xiaowei.sdk.XWDeviceBaseManager;
 import com.tencent.xiaowei.sdk.XWSDK;
 import com.tencent.xiaowei.util.QLog;
+
+import org.xutils.x;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -74,7 +74,7 @@ public class CommonApplication extends Application {
     protected final static String URI_DEVICE_ICON_FORMAT = "http://i.gtimg.cn/open/device_icon/%s/%s/%s/%s/%s.png";
     ////////////////////////////////////////////
 
-    public static Handler mHandler = new Handler();
+    static Handler mHandler = new Handler();
 
     public static boolean isLogined;// 用来标记成功登录过
     public static boolean isOnline;// 用来标记当前是否在线
@@ -84,6 +84,7 @@ public class CommonApplication extends Application {
     public static String mStoragePath;
     public static String mReceiveFileMenuPath;
     private static Toast mToast;
+    public static AudioManager mAudioManager;
 
     @Override
     public void onCreate() {
@@ -99,8 +100,6 @@ public class CommonApplication extends Application {
         mApplication = this;
 
         AssetsUtil.init(this);
-
-        initListener();// 初始化小微sdk的事件监听器
 
         if (!PidInfoConfig.init()) {
             Toast.makeText(this, "请先运行sn生成工具，再重新打开Demo", Toast.LENGTH_LONG).show();
@@ -128,43 +127,106 @@ public class CommonApplication extends Application {
         login.tmpPath = Environment.getExternalStoragePublicDirectory("tencent") + "/device/file/";
         login.tmpCapacity = 1024000l;
 
-        int ret = XWCoreService.init(getApplicationContext(), login);// 初始化小微sdk
+        XWSDK.getInstance().login(getApplicationContext(), login, new XWSDK.OnXWLoginListener() {
+            @Override
+            public void onCheckParam(int errorCode, String info) {
+                // 这里会检测XWLoginInfo格式是否正确，如果出现错误码，后面就不会继续了，请自行检查参数
+                if (errorCode != 0)
+                    showToast("初始化失败：" + info);
+            }
 
-        if (ret != 0) {
-            showToast("初始化失败");
-            return;
-        }
+            @Override
+            public void onConnectedServer(int errorCode) {
+                if (errorCode != 0)
+                    showToast("连接服务器失败 " + errorCode);
+            }
+
+            @Override
+            public void onRegister(int errorCode, int subCode, long din) {
+                // errorCode为1需要关注XWLoginInfo的参数和配置平台的配置是否都正确。其他错误可以联系我们。
+                if (errorCode != 0)
+                    showToast("注册失败 " + subCode + ",请检查网络以及登录的相关信息是否正确。");
+                else {
+                    QLog.i(TAG, "onRegister: din =  " + din);
+                }
+            }
+
+            @Override
+            public void onLogin(int errorCode, String erCodeUrl) {
+                QLog.i(TAG, "onLogin: error =  " + errorCode + " " + erCodeUrl);
+                if (errorCode == 0) {
+                    isLogined = true;
+                    showToastMessage("登录成功");
+                    sendBroadcast(ACTION_LOGIN_SUCCESS);
+                } else {
+                    // 往往需要检查网络，断网了？有没有可能把腾讯的ip地址屏蔽了？
+                    sendBroadcast(ACTION_LOGIN_FAILED);
+                    showToastMessage("登录失败");
+                }
+            }
+
+            @Override
+            public void onBinderListChange(int errorCode, ArrayList<XWBinderInfo> arrayList) {
+                // 刷新联系人的列表以及判断是否需要关闭已经打开的Activity。在绑定者列表变化时会收到回调，例如在手Q或者小微APP那边解绑了。
+                if (errorCode == 0) {
+                    sendBroadcast(ACTION_ON_BINDER_LIST_CHANGE);
+                    if (arrayList.size() == 0) {
+                        XWeiAudioFocusManager.getInstance().abandonAllAudioFocus();// 解绑了应该停止所有的资源的播放
+                    }
+                }
+            }
+        });// 登录小微sdk
+
+        XWSDK.getInstance().setOnXWOnlineStatusListener(new XWSDK.OnXWOnlineStatusListener() {
+            @Override
+            public void onOnline() {
+                isOnline = true;
+                RecordDataManager.getInstance().setHalfWordsCheck(true);
+
+                QLog.i(TAG, "onOnlineSuccess");
+                showToastMessage("上线成功");
+                sendBroadcast("ONLINE");
+            }
+
+            @Override
+            public void onOffline() {
+                isOnline = false;
+                RecordDataManager.getInstance().setHalfWordsCheck(false);
+
+                QLog.i(TAG, "onOfflineSuccess ");
+                showToastMessage("离线");
+                sendBroadcast("OFFLINE");
+            }
+        });
 
         if (!BuildConfig.IS_NEED_VOICE_LINK) {
+            // 不需要配网，打开唤醒按钮悬浮窗
             startService(new Intent(this, WakeupAnimatorService.class));
         }
 
+        // 第三方App需要设置登录态
         XWAccountInfo accountInfo = new XWAccountInfo();
-        XWSDK.getInstance().init(this, accountInfo);
-        QLog.e(TAG, "onCreate");
+        XWSDK.getInstance().setXWAccountInfo(accountInfo);
 
+        QLog.d(TAG, "onCreate");
+
+        // 初始化控制层
         XWeiControl.getInstance().init();
+        XWeiAudioFocusManager.getInstance().init(this);
+        mAudioManager = XWeiAudioFocusManager.getInstance().getAudioManager();
         XWeiControl.getInstance().setXWeiPlayerMgr(new XWeiPlayerMgr(getApplicationContext()));
 
+        // 设置接受TTS数据的监听
         XWSDK.getInstance().setOnReceiveTTSDataListener(new XWSDK.OnReceiveTTSDataListener() {
             @Override
             public boolean onReceive(String voiceId, XWTTSDataInfo ttsData) {
+                // TTS数据交给TTSManager管理
                 TTSManager.getInstance().write(ttsData);
                 return true;
             }
         });
 
-        XWSDK.getInstance().setAutoDownloadFileCallback(new XWSDK.OnAutoDownloadCallback() {
-            @Override
-            public int onDownloadFile(long size, int channel) {
-                QLog.e(TAG, "onDownloadFile size: " + size + " channel: " + channel);
-                //返回0表示继续下载，返回非0表示停止下载
-                return 0;
-            }
-        });
-
-        //初始化cc消息
-        XWCCMsgManager.initC2CMsgModule();
+        //处理cc消息
         XWCCMsgManager.setOnReceiveC2CMsgListener(new XWCCMsgManager.OnReceiveC2CMsgListener() {
             @Override
             public void onReceiveC2CMsg(long from, XWCCMsgInfo msg) {
@@ -199,109 +261,17 @@ public class CommonApplication extends Application {
             }
         });
 
+        // App控制设备设备蓝牙功能，需要自行适配
         if (BluetoothAdapter.getDefaultAdapter() != null) {
             startService(new Intent(this, BLEService.class));
         }
 
-
-        // 初始化音视频Service
+        // 初始化音视频服务Service，用于QQ通话功能。
         startService(new Intent(this, XWAVChatAIDLService.class));
         AVChatManager.getInstance().init(this);
-    }
 
-    public static String getDeviceHeadUrl(String strPID) {
-        if (TextUtils.isEmpty(strPID)) {
-            return "";
-        }
-
-        String fullAppid = strPID;
-        //容错补零
-        if (strPID.length() < 8) {
-            String fillZeroString = "00000000";
-            fullAppid = (fillZeroString + strPID);
-        }
-
-        fullAppid = fullAppid.substring(fullAppid.length() - 8);
-        String iconUrl = String.format(URI_DEVICE_ICON_FORMAT, fullAppid.substring(0, 2),
-                fullAppid.substring(2, 4), fullAppid.substring(4, 6),
-                fullAppid.substring(6, 8),
-                strPID);
-        QLog.d(TAG, iconUrl);
-        return iconUrl;
-    }
-
-    private void initListener() {
-        XWDeviceBaseManager.setOnDeviceRegisterEventListener(new XWDeviceBaseManager.OnDeviceRegisterEventListener() {
-            @Override
-            public void onConnectedServer(int errorCode) {
-                if (errorCode != 0)
-                    showToast("连接服务器失败 " + errorCode);
-            }
-
-            @Override
-            public void onRegister(int errorCode, int subCode) {
-                // errorCode为1需要关注init的参数和配置平台的配置是否都正确。其他错误可以反馈小微。
-                if (errorCode != 0)
-                    showToast("注册失败 " + subCode + ",请检查网络以及登录的相关信息是否正确。");
-            }
-        });
-
-        XWDeviceBaseManager.setOnBinderEventListener(new XWDeviceBaseManager.OnBinderEventListener() {
-
-            @Override
-            public void onBinderListChange(int error, ArrayList<XWBinderInfo> arrayList) {
-                // 刷新MainActivity的列表以及判断是否需要关闭已经打开的Activity
-                if (error == 0) {
-                    sendBroadcast(ACTION_ON_BINDER_LIST_CHANGE);
-                    if (arrayList.size() == 0) {
-                        XWeiAudioFocusManager.getInstance().abandonAllAudioFocus();// 解绑了应该停止所有的资源的播放
-                    }
-                }
-
-            }
-        });// 被绑定、列表变化、擦除所有设备了
-        XWDeviceBaseManager.setOnDeviceSDKEventListener(new XWDeviceBaseManager.OnDeviceLoginEventListener() {
-            @Override
-            public void onLoginComplete(int error) {
-                QLog.i(TAG, "onLoginComplete: error =  " + error);
-                if (error == 0) {
-                    isLogined = true;
-                    showToastMessage("登录成功");
-                    sendBroadcast(ACTION_LOGIN_SUCCESS);
-                } else {
-                    sendBroadcast(ACTION_LOGIN_FAILED);
-                    showToastMessage("登录失败");
-                }
-            }
-
-            @Override
-            public void onOnlineSuccess() {
-                isOnline = true;
-                RecordDataManager.getInstance().setHalfWordsCheck(true);
-
-                QLog.i(TAG, "onOnlineSuccess");
-                showToastMessage("上线成功");
-                sendBroadcast("ONLINE");
-            }
-
-            @Override
-            public void onOfflineSuccess() {
-                isOnline = false;
-                RecordDataManager.getInstance().setHalfWordsCheck(false);
-
-                QLog.i(TAG, "onOfflineSuccess ");
-                showToastMessage("离线");
-                sendBroadcast("OFFLINE");
-            }
-
-            @Override
-            public void onUploadRegInfo(int error) {
-                QLog.i(TAG, "onUploadRegInfoSuccess " + error);
-                if (error == 0) {
-//                    showToastMessage("上传注册信息成功");
-                }
-            }
-        });// 登录成功、上下线
+        // XUtils 初始化
+        x.Ext.init(this);
     }
 
     private void sendBroadcast(String action) {

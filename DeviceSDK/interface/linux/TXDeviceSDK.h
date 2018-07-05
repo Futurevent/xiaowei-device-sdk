@@ -109,12 +109,17 @@ typedef struct tag_tx_binder_remark_info
 //设备通知：登录、在线状态、消息等相关的事件通知
 typedef struct _tx_device_notify
 {
+    // 连接服务器结果，失败会自动重试  error_code 0 连接成功，1 网络不通， 2 ping不通服务器
+    void (*on_connected_server)(int error_code);
+    
+    // 首次注册din的结果，失败会自动重试（间隔时间为n*10秒，n从1开始累加）
+    void (*on_register)(int error_code, int sub_error_code, unsigned long long din);
+    
+    // Login complete callback
+    void (*on_login_complete)(int error_code);
+    
     // 成功上传设备注册信息到服务器（用于跨网绑定模式下是否展示二维码的依据，有此回调则表示信息上传成功，可以展示二维码）
     void (*on_wlan_upload_register_info_success)(int error_code);
-
-    // Login complete callback
-    // 1.6的SDK, 支持设备自注册，即使不绑定也会触发此回调
-    void (*on_login_complete)(int error_code);
 
     // Online status changed ---- status取值为：11 在线、21 离线
     void (*on_online_status)(int old_status, int new_status);
@@ -127,12 +132,6 @@ typedef struct _tx_device_notify
 
     //手Q端或者后台远程重启设备
     void (*on_device_reboot)();
-    
-    // 连接服务器结果，失败会自动重试  error_code 0 连接成功，1 网络不通， 2 ping不通服务器
-    void (*on_connected_server)(int error_code);
-    
-    // 首次注册din的结果，失败会自动重试（间隔时间为n*10秒，n从1开始累加）
-    void (*on_register)(int error_code, int sub_error_code);
 
 } TX_DEVICE_NOTIFY;
 
@@ -266,7 +265,7 @@ SDK_API int tx_erase_all_binders(on_erase_all_binders callback);
  * retvalue: 返回是32位服务器校时时间，内部使用monotonic时间作为累加器，避免受合作方原校时逻辑的影响
  *           如果没有登录成功，则此接口只返回 0
  */
-SDK_API int tx_get_server_time();
+SDK_API unsigned long long tx_get_server_time();
 
 /**
  * 接口说明: 重登录接口
@@ -284,6 +283,10 @@ SDK_API unsigned long long tx_device_get_login_uin();
  * 接口说明：获取小微app设置的备注, 回调的第一个参数
  */
 //typedef void (*on_get_binder_remark_list_result)(int cookie, tx_binder_remark_info * pBinderRemarkList, int nCount);
+
+/**
+ * 接口说明：主动查询小微app设置的备注, 回调参照TX_DEVICE_NOTIFY.on_binder_remark_change
+ */
 SDK_API int tx_get_binder_remark_list();
 
 /**
@@ -299,7 +302,12 @@ SDK_API int tx_set_binder_remark(TX_BINDER_REMARK_INFO *info, on_set_binder_rema
  */
 SDK_API bool getQRCodeUrl(char *pUrlBuf, int bufSize);
 
-SDK_API int tx_ai_audio_statistics_point(const char* compass_name, const char* event, const char* param, unsigned long long time);
+/**
+ * 接口说明：获取自行入网的绑定二维码
+ * @param pUrlBuf 二维码URL Buf
+ * @param bufSize buf长度
+ */
+SDK_API bool get_qr_code_url(char *pUrlBuf, int bufSize);
 
 CXX_EXTERN_END
 

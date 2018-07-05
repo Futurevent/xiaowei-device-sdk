@@ -103,6 +103,46 @@ void on_audio_focus_change(int cookie, int focusChange) {
     }
 }
 
+AUDIOFOCUS_REQUEST_RESULT on_request_audio_focus(int cookie, DURATION_HINT hint) {
+    bool needRelease = false;
+    JNIEnv *env = CGlobalJNIEnv::GetJNIEnv(&needRelease);
+    if (!env) return AUDIOFOCUS_REQUEST_FAILED;
+    if (s_class_XWeiControl == NULL || s_obj_XWeiControl == NULL) {
+        return AUDIOFOCUS_REQUEST_FAILED;
+    }
+    static jmethodID onRequestAudioFocus = NULL;
+    if (onRequestAudioFocus == NULL) {
+        jclass cls = env->GetObjectClass(s_obj_XWeiControl);
+        onRequestAudioFocus = env->GetMethodID(cls, "onRequestAudioFocus", "(II)I");
+        env->DeleteLocalRef(cls);
+    }
+    int ret = env->CallIntMethod(s_obj_XWeiControl, onRequestAudioFocus, cookie, (jint)hint);
+    if (needRelease) {
+        CGlobalJNIEnv::Util_ReleaseEnv();
+    }
+    return (AUDIOFOCUS_REQUEST_RESULT)ret;
+}
+
+AUDIOFOCUS_REQUEST_RESULT on_abandon_audio_focus(int cookie) {
+    bool needRelease = false;
+    JNIEnv *env = CGlobalJNIEnv::GetJNIEnv(&needRelease);
+    if (!env) return AUDIOFOCUS_REQUEST_FAILED;
+    if (s_class_XWeiControl == NULL || s_obj_XWeiControl == NULL) {
+        return AUDIOFOCUS_REQUEST_FAILED;
+    }
+    static jmethodID onAbandonAudioFocus = NULL;
+    if (onAbandonAudioFocus == NULL) {
+        jclass cls = env->GetObjectClass(s_obj_XWeiControl);
+        onAbandonAudioFocus = env->GetMethodID(cls, "onAbandonAudioFocus", "(I)I");
+        env->DeleteLocalRef(cls);
+    }
+    int ret = env->CallIntMethod(s_obj_XWeiControl, onAbandonAudioFocus, cookie);
+    if (needRelease) {
+        CGlobalJNIEnv::Util_ReleaseEnv();
+    }
+    return (AUDIOFOCUS_REQUEST_RESULT)ret;
+}
+
 JNIEXPORT void JNICALL
 Java_com_tencent_xiaowei_control_XWeiControl_nativeInit(JNIEnv *env, jclass service) {
     CPlayerCallback::InitClasses(env, service);
@@ -110,10 +150,22 @@ Java_com_tencent_xiaowei_control_XWeiControl_nativeInit(JNIEnv *env, jclass serv
     txc_xwei_control xwei_control = {0};
     xwei_control.control_callback = &CPlayerCallback::txc_control_android_callback;
     txc_xwei_control_init(&xwei_control);
-    txc_set_audio_focus_change_callback(on_audio_focus_change);
+
+    // txc_set_audio_focus_change_callback(on_audio_focus_change); // 使用内部的焦点控制，放开它，并屏蔽下面两行
+
+    // 使用Android的焦点控制，实现它们：
+     audio_focus_interface.on_request_audio_focus = on_request_audio_focus;
+     audio_focus_interface.on_abandon_audio_focus = on_abandon_audio_focus;
 
     txc_set_log_function(android_log_mapping);
 
+}
+
+JNIEXPORT jint JNICALL
+Java_com_tencent_xiaowei_control_XWeiControl_nativeSetAudioFocusChange(JNIEnv *env, jclass service,
+                                                             jint cookie, jint duration) {
+    txc_set_audio_focus_interface_change(cookie, (DURATION_HINT) duration);
+    return cookie;
 }
 
 JNIEXPORT void JNICALL
@@ -208,13 +260,14 @@ Java_com_tencent_xiaowei_control_XWeiControl_nativeProcessResponse(JNIEnv *env, 
                                              "Lcom/tencent/xiaowei/info/XWContextInfo;");
     jfieldID jfResGroup = env->GetFieldID(clsResponse, "resources",
                                           "[Lcom/tencent/xiaowei/info/XWResGroupInfo;");
+    jfieldID jfResourceListType = env->GetFieldID(clsResponse, "resourceListType", "I");
 
     jfieldID jfRequestText = env->GetFieldID(clsResponse, "requestText", "Ljava/lang/String;");
     jfieldID jfResponseData = env->GetFieldID(clsResponse, "responseData", "Ljava/lang/String;");
     jfieldID jfAutoTestData = env->GetFieldID(clsResponse, "autoTestData", "Ljava/lang/String;");
-    jfieldID jfResponseType = env->GetFieldID(clsResponse, "responseType", "I");
     jfieldID jfResultCode = env->GetFieldID(clsResponse, "resultCode", "I");
     jfieldID jfHasMore = env->GetFieldID(clsResponse, "hasMorePlaylist", "Z");
+    jfieldID jfHasHistory = env->GetFieldID(clsResponse, "hasHistoryPlaylist", "Z");
     jfieldID jfIsRecovery = env->GetFieldID(clsResponse, "recoveryAble", "Z");
     jfieldID jfPlayBehavior = env->GetFieldID(clsResponse, "playBehavior", "I");
     jfieldID jfIsNotify = env->GetFieldID(clsResponse, "isNotify", "Z");
@@ -235,11 +288,12 @@ Java_com_tencent_xiaowei_control_XWeiControl_nativeProcessResponse(JNIEnv *env, 
     }
 
     pRsp.error_code = (unsigned int) env->GetIntField(objResponse, jfResultCode);
-    pRsp.response_type = (unsigned int) env->GetIntField(objResponse, jfResponseType);
     pRsp.has_more_playlist = (bool) env->GetBooleanField(objResponse, jfHasMore);
+    pRsp.has_history_playlist = (bool) env->GetBooleanField(objResponse, jfHasHistory);
     pRsp.is_recovery = (bool) env->GetBooleanField(objResponse, jfIsRecovery);
     pRsp.is_notify = (bool) env->GetBooleanField(objResponse, jfIsNotify);
     pRsp.play_behavior = TXCA_PLAYLIST_ACTION(env->GetIntField(objResponse, jfPlayBehavior));
+    pRsp.resource_list_type = TXCA_PLAYLIST_TYPE(env->GetIntField(objResponse, jfResourceListType));
 
     // SKILL Info
     jobject objSkillInfo = env->GetObjectField(objResponse, jfSkillInfo);
@@ -283,9 +337,6 @@ Java_com_tencent_xiaowei_control_XWeiControl_nativeProcessResponse(JNIEnv *env, 
     jfieldID jfContextId = env->GetFieldID(clsContextInfo, "ID", "Ljava/lang/String;");
     jfieldID jfSpeakTimeout = env->GetFieldID(clsContextInfo, "speakTimeout", "I");
     jfieldID jfSilentTimeout = env->GetFieldID(clsContextInfo, "silentTimeout", "I");
-    jfieldID jfVoiceRequestBegin = env->GetFieldID(clsContextInfo, "voiceRequestBegin", "Z");
-    jfieldID jfVoiceRequestEnd = env->GetFieldID(clsContextInfo, "voiceRequestBegin", "Z");
-    jfieldID jfProfileType = env->GetFieldID(clsContextInfo, "profileType", "I");
 
     jstring strContextId = NULL;
     if (objContextInfo) {
@@ -294,11 +345,6 @@ Java_com_tencent_xiaowei_control_XWeiControl_nativeProcessResponse(JNIEnv *env, 
                                                                      jfSpeakTimeout);
         pRsp.context.silent_timeout = (unsigned int) env->GetIntField(objContextInfo,
                                                                       jfSilentTimeout);
-        pRsp.context.wakeup_profile = TXCA_WAKEUP_PROFILE(
-                env->GetIntField(objContextInfo, jfProfileType));
-        pRsp.context.voice_request_begin = env->GetBooleanField(objContextInfo,
-                                                                jfVoiceRequestBegin);
-        pRsp.context.voice_request_end = env->GetBooleanField(objContextInfo, jfVoiceRequestEnd);
 
     }
     if (strContextId) {
@@ -426,39 +472,6 @@ Java_com_tencent_xiaowei_control_XWeiControl_nativeProcessResponse(JNIEnv *env, 
     }
 
     return ret;
-}
-
-JNIEXPORT void JNICALL
-Java_com_tencent_xiaowei_control_XWeiControl_nativeAddMsgToMsgbox(JNIEnv *env, jclass service, jobject msgInfo)
-{
-    jclass cls_MsgInfo = s_class_MsgInfo;
-    jfieldID jfTinyId = env->GetFieldID(cls_MsgInfo, "tinyId", "J");
-    jfieldID jfType = env->GetFieldID(cls_MsgInfo, "type", "I");
-    jfieldID jfContent = env->GetFieldID(cls_MsgInfo, "content", "Ljava/lang/String;");
-    jfieldID jfDuration = env->GetFieldID(cls_MsgInfo, "duration", "I");
-    jfieldID jfTimeStamp = env->GetFieldID(cls_MsgInfo, "timestamp", "I");
-    jfieldID jfIsRecv = env->GetFieldID(cls_MsgInfo, "isRecv", "Z");
-
-    jlong tinyId = env->GetLongField(msgInfo, jfTinyId);
-    jint type = env->GetIntField(msgInfo, jfType);
-    jstring content = (jstring) env->GetObjectField(msgInfo, jfContent);
-    jint duration = env->GetIntField(msgInfo, jfDuration);
-    jint timestamp = env->GetIntField(msgInfo, jfTimeStamp);
-    jboolean isRecv = (jboolean) env->GetBooleanField(msgInfo, jfIsRecv);
-
-    txc_msg_info info = {0};
-    info.tinyId = tinyId;
-    info.type = type;
-    info.content = env->GetStringUTFChars(content, NULL);
-    info.duration = duration;
-    info.timestamp = timestamp;
-    info.isRecv = isRecv;
-
-    txc_xwei_msgbox_addmsg(&info);
-
-    if (content) {
-        env->ReleaseStringUTFChars(content, info.content);
-    }
 }
 
 

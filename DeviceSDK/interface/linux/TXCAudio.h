@@ -21,7 +21,7 @@
 
 CXX_EXTERN_BEGIN
 
-//语音云服务回调
+//小微服务回调
 typedef struct _txca_callback
 {
     bool (*on_request_callback)(const char *voice_id, TXCA_EVENT event, const char *state_info, const char *extend_info, unsigned int extend_info_len); // 会话请求相关回调
@@ -33,7 +33,7 @@ typedef struct _txca_callback
  * 参数说明：callback AIAudio服务回调接口
  * 返回值  ：错误码（见全局错误码表）
  */
-SDK_API int txca_service_start(TXCA_CALLBACK *callback, TXCA_PARAM_ACCOUNT *account);
+SDK_API int txca_service_start(TXCA_CALLBACK *callback);
 
 /**
  * 接口说明：Stop AI Audio相关服务
@@ -42,7 +42,14 @@ SDK_API int txca_service_start(TXCA_CALLBACK *callback, TXCA_PARAM_ACCOUNT *acco
 SDK_API int txca_service_stop();
 
 /**
- * 接口说明：开始会话请求(普通请求同时只会有一个， 云端校验会有额外的请求)
+ * 接口说明：Start AI Audio相关服务，该服务需要登录成功后才能调用，否则会有错误码返回
+ * 参数说明：callback AIAudio服务回调接口
+ * 返回值  ：错误码（见全局错误码表）
+ */
+SDK_API void txca_set_account_info(TXCA_PARAM_ACCOUNT *account);
+
+/**
+ * 接口说明：开始会话请求(普通请求同时只会有一个， 云端校验类请求额外计算)
  * 返回值  ：错误码（见全局错误码表）
  */
 SDK_API int txca_request(char *voice_id, TXCA_CHAT_TYPE type, const char *chat_data, unsigned int char_data_len, TXCA_PARAM_CONTEXT *context);

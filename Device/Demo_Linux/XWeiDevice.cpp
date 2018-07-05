@@ -15,7 +15,7 @@
  *
  */
 #include "XWeiDevice.h"
-#include "Util.h"
+#include "Utility.h"
 #include "TXDeviceSDK.h"
 #include <stdio.h>
 
@@ -95,7 +95,7 @@ bool CXWeiDevice::Init()
     // 读取License信息
     char license[256] = {0};
     int nLicenseSize = 0;
-    if (!Util::readBufferFromFile("./DeviceData/licence.sign.file.txt", license, sizeof(license), &nLicenseSize)) {
+    if (!Utility::readBufferFromFile("./DeviceData/licence.sign.file.txt", license, sizeof(license), &nLicenseSize)) {
         printf("[error]get license from file failed...\n");
         return false;
     }
@@ -103,7 +103,7 @@ bool CXWeiDevice::Init()
     // 读取guid(SN)信息
     char guid[32] = {0};
     int nGUIDSize = 0;
-    if(!Util::readBufferFromFile("./DeviceData/GUID_file.txt", guid, sizeof(guid), &nGUIDSize)) {
+    if(!Utility::readBufferFromFile("./DeviceData/GUID_file.txt", guid, sizeof(guid), &nGUIDSize)) {
         printf("[error]get guid from file failed...\n");
         return false;
     }
@@ -111,7 +111,7 @@ bool CXWeiDevice::Init()
     // 读取服务器公钥信息
     char svrPubkey[256] = {0};
     int nPubkeySize = 0;
-    if (!Util::readBufferFromFile("./DeviceData/1700004669.pem", svrPubkey, sizeof(svrPubkey), &nPubkeySize))
+    if (!Utility::readBufferFromFile("./DeviceData/2100000244.pem", svrPubkey, sizeof(svrPubkey), &nPubkeySize))
     {
         printf("[error]get svrPubkey from file faileds..\n");
         return NULL;
@@ -125,7 +125,7 @@ bool CXWeiDevice::Init()
     info.device_license         = license;           // 设备License，与SN一一对应，SN和License的生成方法和规则，请参考文档：https://xiaowei.qcloud.com/wiki/#TechMisc_license_calc
     info.product_version        = 1;                 // 固件版本号，与OTA升级相关，设备应保存该版本号
     info.network_type           = network_type_wifi; // 网络类型
-    info.product_id             = 1700004669;        // 设备Pid信息，通过小微硬件开放平台上的配置平台注册一个新设备后会分配pid信息，请自行替换
+    info.product_id             = 2100000244;        // 设备Pid信息，通过小微硬件开放平台上的配置平台注册一个新设备后会分配pid信息，请自行替换
     info.server_pub_key         = svrPubkey;         // 服务器公钥，通过小微硬件开放平台的配置平台下载，与某个设备是关联的
 
     // 设备登录、在线状态、消息等相关的事件通知
@@ -155,7 +155,7 @@ bool CXWeiDevice::Init()
 
     // 设置log输出函数，如果不想打印log，则无需设置。
     // 建议开发在开发调试阶段开启log，在产品发布的时候禁用log。
-    tx_set_log_func(Util::log_func, 1, 1);
+    tx_set_log_func(Utility::log_func, 1, 1);
 
     // 初始化SDK，若初始化成功，则内部会启动一个线程去执行相关逻辑，该线程会持续运行，直到收到 exit 调用
     int ret = tx_init_device(&info, &notify, &init_path);

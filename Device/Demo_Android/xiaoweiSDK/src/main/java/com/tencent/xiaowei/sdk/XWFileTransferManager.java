@@ -24,21 +24,41 @@ import java.util.HashMap;
 /**
  * 内部使用的文件传输通道
  */
-class XWFileTransferManager {
+public class XWFileTransferManager {
 
     public static final String TAG = "XWFileTransferManager";
 
-    private static HashMap<Long, XWSDK.OnFileTransferListener> mOnFileTransferListenerMap = new HashMap<>();
+    private static HashMap<Long, OnFileTransferListener> mOnFileTransferListenerMap = new HashMap<>();
 
     private static HashMap<Long, XWFileTransferInfo> failedCookie = new HashMap<>();
     private static HashMap<XWFileTransferInfo, Integer> failedCode = new HashMap<>();
 
-    private static XWSDK.OnAutoDownloadCallback mAutoDownloadCallback = null;
+    private static OnAutoDownloadCallback mAutoDownloadCallback = null;
 
+    /**
+     * 文件传输的进度与结果
+     */
+    public interface OnFileTransferListener {
+        /**
+         * 文件传输的进度
+         *
+         * @param transferProgress
+         * @param maxTransferProgress
+         */
+        void onProgress(long transferProgress, long maxTransferProgress);
+
+        /**
+         * 文件传输的结果
+         *
+         * @param info
+         * @param errorCode
+         */
+        void onComplete(XWFileTransferInfo info, int errorCode);
+    }
 
 
     static void onFileTransferProgress(long cookie, final long transferProgress, final long maxTransferProgress) {
-        final XWSDK.OnFileTransferListener listener = mOnFileTransferListenerMap.get(cookie);
+        final OnFileTransferListener listener = mOnFileTransferListenerMap.get(cookie);
         if (listener != null) {
             listener.onProgress(transferProgress, maxTransferProgress);
         }
@@ -46,7 +66,7 @@ class XWFileTransferManager {
 
     static void onFileTransferComplete(final XWFileTransferInfo info, final int errorCode) {
         QLog.d(TAG, "onFileTransferComplete " + info + " " + errorCode);
-        final XWSDK.OnFileTransferListener listener = mOnFileTransferListenerMap.remove(info.id);
+        final OnFileTransferListener listener = mOnFileTransferListenerMap.remove(info.id);
         if (listener != null) {
             XWSDKJNI.postMain(new Runnable() {
                 @Override
@@ -67,7 +87,21 @@ class XWFileTransferManager {
         return 0;
     }
 
-    public static void setAutoDownloadCallback(XWSDK.OnAutoDownloadCallback cb) {
+    /**
+     * 设置自动下载的回调通知
+     */
+    public interface OnAutoDownloadCallback {
+        /**
+         * 调用下载接口后，通知文件大小和使用的文件通道
+         *
+         * @param size    文件大小
+         * @param channel 文件通道
+         * @return 0:下载 非0:取消下载
+         */
+        int onDownloadFile(long size, int channel);
+    }
+
+    public static void setAutoDownloadCallback(OnAutoDownloadCallback cb) {
         mAutoDownloadCallback = cb;
     }
 
@@ -79,7 +113,7 @@ class XWFileTransferManager {
      * @param fileType    输文件类型
      * @return 返回的cookie, 在传输相关的回调中作为参数，也可以cancelTransfer
      */
-    public static long uploadFile(String filePath, int channelType, int fileType, XWSDK.OnFileTransferListener listener) {
+    public static long uploadFile(String filePath, int channelType, int fileType, OnFileTransferListener listener) {
         long cookie = XWSDKJNI.uploadFile(filePath, channelType, fileType);
         if (listener != null) {
             if (failedCookie.containsKey(cookie)) {
@@ -101,7 +135,7 @@ class XWFileTransferManager {
      * @param listener
      * @return
      */
-    public static long downloadMiniFile(String fileKey, int fileType, String miniToken, XWSDK.OnFileTransferListener listener) {
+    public static long downloadMiniFile(String fileKey, int fileType, String miniToken, OnFileTransferListener listener) {
         long cookie = XWSDKJNI.downloadMiniFile(fileKey, fileType, miniToken);
         if (listener != null) {
             if (failedCookie.containsKey(cookie)) {

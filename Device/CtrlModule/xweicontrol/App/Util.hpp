@@ -25,17 +25,22 @@
 
 namespace Util
 {
-    bool IsInvaild(const TXCA_PARAM_RESPONSE &cRsp);
-    bool IsVaild(const TXCA_PARAM_RESPONSE &cRsp);
-    bool IsTempRsp(const TXCA_PARAM_RESPONSE &cRsp);
-    bool IsCommandRsp(const TXCA_PARAM_RESPONSE &cRsp);
-    int GetNewProcessId();
-    std::string ToString(const TXCA_PARAM_RESPONSE &cRsp);
-    std::string ToString(XWM_EVENT e);
-    std::string ToString(DURATION_HINT e);
-    std::string ToString(TXC_PLAYER_ACTION e);
-    std::string ToString(TXC_PLAYER_STATE e);
-    std::string ToString(player_control e);
+unsigned long long GetCurTimeMsLocal();
+
+// 没有当前场景和上一次场景，并且没有播放资源和自动唤醒标Î记
+bool IsInvaild(const TXCA_PARAM_RESPONSE &cRsp);
+// 有当前场景，或者有播放资源或自动唤醒标记
+bool IsVaild(const TXCA_PARAM_RESPONSE &cRsp);
+bool IsTempRsp(const TXCA_PARAM_RESPONSE &cRsp);
+bool IsCommandRsp(const TXCA_PARAM_RESPONSE &cRsp);
+int GetNewProcessId();
+std::string ToString(const TXCA_PARAM_RESPONSE &cRsp);
+std::string ToString(XWM_EVENT e);
+std::string ToString(DURATION_HINT e);
+std::string ToString(TXC_PLAYER_ACTION e);
+std::string ToString(TXC_PLAYER_STATE e);
+std::string ToString(player_control e);
+std::string ToString(txc_playlist_t t);
 }
 
 #endif

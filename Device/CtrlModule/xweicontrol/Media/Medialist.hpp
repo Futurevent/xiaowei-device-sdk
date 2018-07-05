@@ -29,29 +29,30 @@ typedef std::vector<PtrMedia> MediaArray;
 //  play list, contains a list of TXCMedia and its' play sequence
 class TXCMediaList
 {
-  public:
-    TXCMediaList();
-    const txc_playlist_t &GetInfo() const;
-    void SetInfo(txc_playlist_t *info);
+public:
+  TXCMediaList();
+  const txc_playlist_t &GetInfo() const;
+  void SetInfo(txc_playlist_t *info);
+  void ResetInfo();
 
-    //  @return index
-    int Add(int index, PtrMedia &media);
-    int Update();
-    //    int Add(int index, const TXCAutoPtr<TXCMediaList> &other);
-    bool Remove(int index);
-    bool Remove(const std::vector<int> &vIndexes);
-    void Clear();
+  //  @return index
+  int Add(int index, PtrMedia &media);
+  int Update();
+  //    int Add(int index, const TXCAutoPtr<TXCMediaList> &other);
+  bool Remove(int index);
+  bool Remove(const std::vector<int> &vIndexes);
+  void Clear(int list_type = -1);
 
-    size_t Count() const;
-    PtrMedia Get(int index);
-    PtrMedia Get(const char *res_id);
-    
-    int Find(const char *res_id);
-    std::string ToString();
+  size_t Count() const;
+  PtrMedia Get(int index);
+  PtrMedia Get(const char *res_id);
 
-  private:
-    MediaArray media_array_;     //  媒体列表
-    txc_playlist_t info_;
+  int Find(const char *res_id);
+  std::string ToString();
+
+private:
+  MediaArray media_array_; //  媒体列表
+  txc_playlist_t info_;
 };
 
 typedef TXCAutoPtr<TXCMediaList> PtrMediaList;

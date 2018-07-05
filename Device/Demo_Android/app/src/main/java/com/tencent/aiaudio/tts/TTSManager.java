@@ -24,11 +24,10 @@ import com.tencent.xiaowei.info.XWTTSDataInfo;
 import com.tencent.xiaowei.sdk.XWSDK;
 import com.tencent.xiaowei.util.Singleton;
 
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.PriorityBlockingQueue;
+import java.util.concurrent.TimeoutException;
 
 public class TTSManager {
 
@@ -90,85 +89,112 @@ public class TTSManager {
     }
 
     /**
-     * 查询resId相关的TTS信息
+     * 查询resId相关的TTS信息，如果没收到push，一直阻塞
      *
      * @param resID
      * @return
      */
-    public synchronized TTSItem getInfo(String resID) {
+    public TTSItem getInfo(String resID) {
+        try {
+            return getInfo(resID, 0);
+        } catch (TimeoutException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+    /**
+     * 查询resId相关的TTS信息，并设置超时时间
+     *
+     * @param resID
+     * @param timeout 单位ms，超过这个时间没获得结果将抛出异常
+     * @return
+     */
+    public synchronized TTSItem getInfo(String resID, int timeout) throws TimeoutException {
         TTSItem item = mCache.get(resID);
+
+        long absTime = System.currentTimeMillis() + timeout;
+        long waitTime = timeout;
         while (item == null) {
             try {
-                wait();
+                if (waitTime > 0) {
+                    wait(waitTime);
+                } else {
+                    wait();
+                }
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
             item = mCache.get(resID);
+            waitTime = absTime - System.currentTimeMillis();
+            if (waitTime <= 0 && timeout > 0) {
+                break;
+            }
+        }
+        if (item == null) {
+            throw new TimeoutException();
         }
         return item;
     }
 
     /**
-     * 根据resId顺序读取TTS的opus数据
+     * 根据resId顺序读取TTS的opus数据，如果没收到push，一直阻塞
      *
      * @param resID
      * @return
      */
-    public synchronized XWTTSDataInfo read(String resID) {
-        TTSItem item = mCache.get(resID);
-        while (item == null) {
-            try {
-                wait();
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
-            item = mCache.get(resID);
+    public XWTTSDataInfo read(String resID) {
+        try {
+            return read(resID, 0);
+        } catch (TimeoutException e) {
+            e.printStackTrace();
         }
+        return null;
+    }
+
+    /**
+     * 根据resId顺序读取TTS的opus数据，并设置超时时间
+     *
+     * @param resID
+     * @param timeout 单位ms，超过这个时间没获得结果将抛出异常
+     * @return
+     */
+    public synchronized XWTTSDataInfo read(String resID, int timeout) throws TimeoutException {
+        long absTime = System.currentTimeMillis() + timeout;
+        TTSItem item = getInfo(resID, timeout);
         if (item.curSeq > -1 && item.curSeq == item.length - 1 && item.isEnd) {
-            XWTTSDataInfo data = new XWTTSDataInfo();
-            data.pcmSampleRate = item.pcmSampleRate;
-            data.sampleRate = item.sampleRate;
-            data.channel = item.channel;
-            data.format = item.format;
-            data.data = item.allData;
-            data.isEnd = item.isEnd;
-            data.resID = item.resID;
-            if (data.data == null) {
-                ByteArrayOutputStream bos = new ByteArrayOutputStream();
+            item.curSeq = -1;
+        }
+        XWTTSDataInfo data = null;
+        while (data == null) {
+            for (XWTTSDataInfo tts : item.data) {
+                if (tts.seq == item.curSeq + 1) {
+                    item.curSeq++;
+                    data = tts;
+                    break;
+                }
+            }
+            if (data == null) {
+                long waitTime = absTime - System.currentTimeMillis();
+                if (waitTime <= 0 && timeout > 0) {
+                    break;
+                }
+
                 try {
-                    for (XWTTSDataInfo tts : item.data) {
-                        if (tts.data != null)
-                            bos.write(tts.data);
+                    if (waitTime > 0) {
+                        wait(waitTime);
+                    } else {
+                        wait();
                     }
-                    bos.flush();
-                    data.data = item.allData = bos.toByteArray();
-                    item.data.clear();
-                    bos.close();
-                } catch (IOException e) {
+                } catch (InterruptedException e) {
                     e.printStackTrace();
                 }
             }
-            return data;
-        } else {
-            XWTTSDataInfo data = null;
-            while (data == null) {
-                for (XWTTSDataInfo tts : item.data) {
-                    if (tts.seq == item.curSeq + 1) {
-                        item.curSeq++;
-                        data = tts;
-                        break;
-                    }
-                }
-                if (data == null) {
-                    try {
-                        wait();
-                    } catch (InterruptedException e) {
-                        e.printStackTrace();
-                    }
-                }
-            }
-            return data;
         }
+        if (data == null) {
+            throw new TimeoutException();
+        }
+        return data;
     }
 
     /**
@@ -179,11 +205,7 @@ public class TTSManager {
     public void reset(String resID) {
         TTSItem item = mCache.get(resID);
         if (item != null) {
-            if (item.isEnd) {
-                item.curSeq = item.length - 1;
-            } else {
-                item.curSeq = -1;
-            }
+            item.curSeq = -1;
         }
     }
 
@@ -258,15 +280,14 @@ public class TTSManager {
 
     public static class TTSItem {
         PriorityBlockingQueue<XWTTSDataInfo> data = new PriorityBlockingQueue<>();
-        public byte[] allData;
         boolean isEnd;
         public int pcmSampleRate;
         public int sampleRate;
         public int channel;
         public int format;
         public String resID;
-        int curSeq = -1;
-        int length;
+        public int curSeq = -1;
+        public int length;
     }
 
 }

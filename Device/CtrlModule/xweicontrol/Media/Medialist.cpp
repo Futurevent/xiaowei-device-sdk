@@ -23,6 +23,7 @@
 TXCMediaList::TXCMediaList()
 {
     memset(&info_, 0, sizeof(info_));
+    ResetInfo();
 }
 
 int TXCMediaList::Add(int index, PtrMedia &media)
@@ -46,7 +47,6 @@ int TXCMediaList::Add(int index, PtrMedia &media)
 
 //int TXCMediaList::Add(int index, const TXCAutoPtr<TXCMediaList> &other)
 //{
-//    //  TODO:
 //
 //
 //    info_.count = media_array_.size();
@@ -63,10 +63,10 @@ bool TXCMediaList::Remove(int index)
         {
             PtrMedia media = *itr;
 
+            exists = true;
+
             //  删除内容，但是保留占位，保证 index 不变。
             itr->reset();
-
-            exists = true;
 
             //  clear reference in media center
             if (media.use_count() == 2)
@@ -80,23 +80,32 @@ bool TXCMediaList::Remove(int index)
     return exists;
 }
 
-void TXCMediaList::Clear()
+void TXCMediaList::Clear(int list_type)
 {
     MediaArray::iterator itr = media_array_.begin();
     while (media_array_.end() != itr)
     {
         PtrMedia &media = *itr;
 
-        //  clear reference in media center
-        if (media.use_count() == 2)
+        if (media.get() && media->Belong(list_type))
         {
-            TXCServices::instance()->GetMediaCenter()->RemoveMedia(media->GetInfo().res_id);
+
+            //  删除内容，但是保留占位，保证 index 不变。
+            itr->reset();
+            //  clear reference in media center
+            if (media.use_count() == 2)
+            {
+                TXCServices::instance()->GetMediaCenter()->RemoveMedia(media->GetInfo().res_id);
+            }
         }
         ++itr;
     }
-    media_array_.clear();
+    if (list_type == -1)
+    { // 如果是清空所有元素，就清理数组，否则不清理，保持index不变。
+        media_array_.clear();
+    }
 
-    info_.count = 0;
+    info_.count = (int)media_array_.size();
 }
 
 const txc_playlist_t &TXCMediaList::GetInfo() const
@@ -109,7 +118,20 @@ void TXCMediaList::SetInfo(txc_playlist_t *info)
     info_.playlist_id = info->playlist_id;
     info_.count = info->count;
     info_.type = info->type;
-    info_.hasMore = info->hasMore;
+    info_.has_more_current = info->has_more_current;
+    info_.has_more_current_up = info->has_more_current_up;
+    info_.has_more_history = info->has_more_history;
+    info_.has_more_history_up = info->has_more_history_up;
+    info_.has_history = info->has_history;
+}
+
+void TXCMediaList::ResetInfo()
+{
+    info_.has_more_current = true;
+    info_.has_more_current_up = true;
+    info_.has_more_history = true;
+    info_.has_more_history_up = true;
+    info_.has_history = false;
 }
 
 size_t TXCMediaList::Count() const
@@ -190,10 +212,10 @@ int TXCMediaList::Find(const char *res_id)
 std::string TXCMediaList::ToString()
 {
     std::stringstream ss;
-    ss<< "[TXCMediaList:";
-    ss<< "size:";
-    ss<< media_array_.size();
-    ss<< " ";
+    ss << "[TXCMediaList:";
+    ss << "size:";
+    ss << media_array_.size();
+    ss << " ";
     for (MediaArray::iterator itr = media_array_.begin();
          media_array_.end() != itr;
          ++itr)
@@ -207,32 +229,28 @@ std::string TXCMediaList::ToString()
             {
                 ss << "resId:";
                 ss << info.res_id;
-                ss <<", ";
+                ss << ", ";
             }
-            if (info.description && info.description[0]){
-            ss << "description:";
-            ss<< info.description;
+            if (info.description && info.description[0])
+            {
+                ss << "description:";
+                ss << info.description;
             }
-        ss << "},";
-        } else {
-            ss<<"{null},";
+            ss << "},";
+        }
+        else
+        {
+            ss << "{null},";
         }
     }
-    
-    ss<< "]";
+
+    ss << "]";
     return ss.str();
 }
 
 PtrMediaList GetMediaList(SESSION id)
 {
-    PtrMediaList result;
-
-    PtrPlayer player = TXCServices::instance()->GetPlayerManager()->GetPlayer(id);
-    if (player.get())
-    {
-        result = player->GetMediaList();
-    }
-
+    PtrMediaList result = TXCServices::instance()->GetMediaCenter()->GetMediaList(id);
     return result;
 }
 

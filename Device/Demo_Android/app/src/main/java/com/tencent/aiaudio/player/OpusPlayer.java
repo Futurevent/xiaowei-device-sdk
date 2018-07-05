@@ -23,6 +23,7 @@ import com.tencent.xiaowei.util.QLog;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.concurrent.TimeoutException;
 
 public class OpusPlayer extends BasePlayer {
     private final static String TAG = "OpusPlayer";
@@ -67,7 +68,13 @@ public class OpusPlayer extends BasePlayer {
         }
         Runnable runnable = new Runnable() {
             public void run() {
-                TTSManager.TTSItem item = TTSManager.getInstance().getInfo(resId);
+                TTSManager.TTSItem item;
+                try {
+                    item = TTSManager.getInstance().getInfo(resId, 5000);
+                } catch (TimeoutException e) {
+                    notifyOnError(408, 5000);
+                    return;
+                }
                 mOpusDecoder = new OpusDecoder();
                 id = _s_id++;
                 mOpusDecoder.init(id, item.sampleRate, item.channel);
@@ -75,8 +82,13 @@ public class OpusPlayer extends BasePlayer {
                 XWTTSDataInfo data = null;
                 int count = 0;// 缓冲5包
 
-                while ((data == null || !data.isEnd) && count < 5) {
-                    data = TTSManager.getInstance().read(resId);
+                while ((data == null || item.curSeq < item.length) && count < 5) {
+                    try {
+                        data = TTSManager.getInstance().read(resId, 5000);
+                    } catch (TimeoutException e) {
+                        notifyOnError(408, 5000);
+                        return;
+                    }
                     if (data.data != null) {
                         byte[] buffer = mOpusDecoder.decoder(id, data.data);
                         if (buffer != null) {
@@ -97,6 +109,9 @@ public class OpusPlayer extends BasePlayer {
     }
 
     private void initPcmPlayer() {
+        if (mPcmPlayer != null) {
+            mPcmPlayer.release();
+        }
         mPcmPlayer = new PcmPlayer();
         mPcmPlayer.setAudioSessionId(mSessionId);
         mPcmPlayer.setVolume(mLeftVolume, mRightVolume);
@@ -135,7 +150,12 @@ public class OpusPlayer extends BasePlayer {
             prepareData.clear();
             XWTTSDataInfo data = null;
             while (isPlaying && (data == null || !data.isEnd)) {
-                data = TTSManager.getInstance().read(resId);
+                try {
+                    data = TTSManager.getInstance().read(resId, 5000);
+                } catch (TimeoutException e) {
+                    notifyOnError(408, 5000);
+                    return;
+                }
                 if (!data.isEnd) {
                     byte[] buffer = mOpusDecoder.decoder(id, data.data);
                     if (buffer != null) {

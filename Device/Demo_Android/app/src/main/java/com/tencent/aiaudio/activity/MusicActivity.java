@@ -22,9 +22,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.ServiceConnection;
-import android.media.AudioManager;
 import android.os.Bundle;
-import android.os.Handler;
 import android.os.IBinder;
 import android.os.RemoteException;
 import android.support.v4.content.LocalBroadcastManager;
@@ -49,17 +47,14 @@ import com.tencent.aiaudio.adapter.CommonListAdapter;
 import com.tencent.aiaudio.demo.IControlService;
 import com.tencent.aiaudio.demo.R;
 import com.tencent.aiaudio.service.ControlService;
-import com.tencent.aiaudio.utils.DemoOnAudioFocusChangeListener;
 import com.tencent.aiaudio.utils.UIUtils;
 import com.tencent.aiaudio.view.VoiceView;
 import com.tencent.xiaowei.control.Constants;
-import com.tencent.xiaowei.control.XWeiAudioFocusManager;
 import com.tencent.xiaowei.control.XWeiControl;
 import com.tencent.xiaowei.control.info.XWeiSessionInfo;
 import com.tencent.xiaowei.def.XWCommonDef;
 import com.tencent.xiaowei.info.MediaMetaInfo;
 import com.tencent.xiaowei.info.XWAppInfo;
-import com.tencent.xiaowei.info.XWContextInfo;
 import com.tencent.xiaowei.sdk.XWSDK;
 import com.tencent.xiaowei.util.JsonUtil;
 
@@ -73,6 +68,7 @@ import static com.tencent.aiaudio.service.ControlService.ACTION_MUSIC_ON_REPEAT_
 import static com.tencent.aiaudio.service.ControlService.ACTION_MUSIC_ON_RESUME;
 import static com.tencent.aiaudio.service.ControlService.ACTION_MUSIC_ON_STOP;
 import static com.tencent.aiaudio.service.ControlService.ACTION_MUSIC_ON_UNKEEP;
+import static com.tencent.aiaudio.service.ControlService.ACTION_MUSIC_ON_UPDATE_HISTORY_PLAY_LIST;
 import static com.tencent.aiaudio.service.ControlService.ACTION_MUSIC_ON_UPDATE_PLAY_LIST;
 import static com.tencent.aiaudio.service.ControlService.EXTRA_KEY_MUSIC_ON_EVENT_SESSION_ID;
 import static com.tencent.aiaudio.service.ControlService.EXTRA_KEY_START_SKILL_DATA;
@@ -157,7 +153,6 @@ public class MusicActivity extends BaseActivity implements View.OnClickListener 
 
     private MediaMetaInfo mCurrentMusicInfo;
 
-    private Handler mHandler = new Handler();
     private Runnable mTimerRunnable = new Runnable() {
         @Override
         public void run() {
@@ -175,7 +170,9 @@ public class MusicActivity extends BaseActivity implements View.OnClickListener 
 
     private boolean isSeek;
     private ListView mListView;
+    private ListView mListViewHistory;
     private CommonListAdapter<MediaMetaInfo> mAdapter;
+    private CommonListAdapter<MediaMetaInfo> mHistoryAdapter;
     private View mParentView;
 
     private TextView mTvBack;
@@ -186,6 +183,8 @@ public class MusicActivity extends BaseActivity implements View.OnClickListener 
 
     // 品质的全局设置值
     private int settingQuality;
+    private Button mBtnSwitchDefaultList;
+    private Button mBtnSwitchHistoryList;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -205,6 +204,7 @@ public class MusicActivity extends BaseActivity implements View.OnClickListener 
         filter.addAction(ACTION_MUSIC_ON_RESUME);
         filter.addAction(ACTION_MUSIC_ON_REPEAT_MODE);
         filter.addAction(ACTION_MUSIC_ON_UPDATE_PLAY_LIST);
+        filter.addAction(ACTION_MUSIC_ON_UPDATE_HISTORY_PLAY_LIST);
         filter.addAction(ACTION_MUSIC_ON_KEEP);
         filter.addAction(ACTION_MUSIC_ON_UNKEEP);
         filter.addAction(ACTION_MUSIC_ON_STOP);
@@ -235,6 +235,7 @@ public class MusicActivity extends BaseActivity implements View.OnClickListener 
         try {
             if (mMusicService != null) {
                 List<MediaMetaInfo> currentPlayList = mMusicService.getCurrentMediaList(sessionId);
+                List<MediaMetaInfo> currentHistoryPlayList = mMusicService.getCurrentHistoryMediaList(sessionId);
                 mCurrentMusicInfo = mMusicService.getCurrentMediaInfo(sessionId);
                 if (mCurrentMusicInfo != null) {
                     mBtnLike.setImageResource(mCurrentMusicInfo.favorite ? R.drawable.btn_like_active : R.drawable.btn_like);
@@ -246,6 +247,19 @@ public class MusicActivity extends BaseActivity implements View.OnClickListener 
                 mAdapter.addAll(currentPlayList);
                 mAdapter.notifyDataSetChanged();
 
+                if (currentHistoryPlayList.size() > 0) {
+                    mBtnSwitchDefaultList.setClickable(true);
+                    mBtnSwitchHistoryList.setClickable(true);
+                    mBtnSwitchHistoryList.setVisibility(View.VISIBLE);
+                    mHistoryAdapter.clear();
+                    mHistoryAdapter.addAll(currentHistoryPlayList);
+                    mHistoryAdapter.notifyDataSetChanged();
+                } else {
+                    mBtnSwitchDefaultList.setClickable(false);
+                    mBtnSwitchHistoryList.setClickable(false);
+                    mBtnSwitchHistoryList.setVisibility(View.GONE);
+                }
+
                 mPlayMode = mMusicService.getCurrentPlayMode(sessionId);
 
                 mBtnPlayMode.setImageResource((mPlayMode == Constants.RepeatMode.REPEAT_MODE_SEQUENCE
@@ -253,22 +267,6 @@ public class MusicActivity extends BaseActivity implements View.OnClickListener 
                         (mPlayMode == Constants.RepeatMode.REPEAT_MODE_RANDOM ? R.drawable.btn_play_mode_shuffle : R.drawable.btn_play_mode_single));
 
                 mBtnPlay.setImageResource(mMusicService.isPlaying(sessionId) ? R.drawable.btn_pause : R.drawable.btn_play);
-            }
-        } catch (RemoteException e) {
-            e.printStackTrace();
-        }
-    }
-
-    /**
-     * 更新播放列表
-     */
-    private void updatePlayList() {
-        try {
-            if (mMusicService != null) {
-                List<MediaMetaInfo> currentPlayList = mMusicService.getCurrentMediaList(sessionId);
-                mAdapter.clear();
-                mAdapter.addAll(currentPlayList);
-                mAdapter.notifyDataSetChanged();
             }
         } catch (RemoteException e) {
             e.printStackTrace();
@@ -300,6 +298,7 @@ public class MusicActivity extends BaseActivity implements View.OnClickListener 
                     Log.d(TAG, "正在播放：" + mCurrentMusicInfo);
                     mBtnPlay.setImageResource(R.drawable.btn_pause);
                     mAdapter.notifyDataSetChanged();
+                    mHistoryAdapter.notifyDataSetChanged();
                     break;
                 case ACTION_MUSIC_ON_PAUSE:
                     mSessionId = intent.getIntExtra(EXTRA_KEY_MUSIC_ON_EVENT_SESSION_ID, 0);
@@ -331,6 +330,7 @@ public class MusicActivity extends BaseActivity implements View.OnClickListener 
                             (mPlayMode == Constants.RepeatMode.REPEAT_MODE_RANDOM ? R.drawable.btn_play_mode_shuffle : R.drawable.btn_play_mode_single));
                     break;
                 case ACTION_MUSIC_ON_UPDATE_PLAY_LIST:
+                case ACTION_MUSIC_ON_UPDATE_HISTORY_PLAY_LIST:
                     mSessionId = intent.getIntExtra(EXTRA_KEY_START_SKILL_SESSION_ID, 0);
                     if (mSessionId != sessionId) {
                         return;
@@ -391,6 +391,8 @@ public class MusicActivity extends BaseActivity implements View.OnClickListener 
         mCoverPic = (ImageView) findViewById(R.id.img_music_cover);
         mCtrlBar = (RelativeLayout) findViewById(R.id.rlt_music_ctrlbar);
 
+        mBtnSwitchDefaultList = (Button) findViewById(R.id.btn_default);
+        mBtnSwitchHistoryList = (Button) findViewById(R.id.btn_history);
         mListView = (ListView) findViewById(R.id.lv_list);
         mAdapter = new CommonListAdapter<MediaMetaInfo>() {
             @Override
@@ -424,6 +426,40 @@ public class MusicActivity extends BaseActivity implements View.OnClickListener 
             }
         };
         mListView.setAdapter(mAdapter);
+
+        mListViewHistory = (ListView) findViewById(R.id.lv_list_history);
+        mHistoryAdapter = new CommonListAdapter<MediaMetaInfo>() {
+            @Override
+            protected View initListCell(int position, View convertView, ViewGroup parent) {
+
+                Holder holder;
+                if (convertView == null) {
+                    convertView = getLayoutInflater().inflate(R.layout.music_list_item, parent, false);
+                    holder = new Holder();
+                    holder.tvName = (TextView) convertView.findViewById(R.id.item_music_name);
+                    holder.tvSingle = (TextView) convertView.findViewById(R.id.item_music_singer);
+                    holder.voiceView = (VoiceView) convertView.findViewById(R.id.item_music_select);
+                    convertView.setTag(holder);
+                } else {
+                    holder = (Holder) convertView.getTag();
+                }
+                holder.tvName.setText(mHistoryAdapter.getItem(position).name != null ? mHistoryAdapter.getItem(position).name : "");
+                holder.tvSingle.setText(mHistoryAdapter.getItem(position).artist != null ? mHistoryAdapter.getItem(position).artist : "");
+                if (mHistoryAdapter.getItem(position).equals(mCurrentMusicInfo)) {
+                    holder.voiceView.setVisibility(View.VISIBLE);
+                } else {
+                    holder.voiceView.setVisibility(View.GONE);
+                }
+                return convertView;
+            }
+
+            class Holder {
+                TextView tvName;
+                TextView tvSingle;
+                VoiceView voiceView;
+            }
+        };
+        mListViewHistory.setAdapter(mHistoryAdapter);
 
     }
 
@@ -563,7 +599,7 @@ public class MusicActivity extends BaseActivity implements View.OnClickListener 
             @Override
             public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
                 boolean result = XWeiControl.getInstance().
-                        getMediaTool().txcPlayerControl(sessionId, Constants.XWeiControlCode.PLAYER_PLAY, position, 0);
+                        getMediaTool().txcPlayerControl(sessionId, Constants.XWeiControlCode.PLAYER_PLAY, position, XWCommonDef.ResourceListType.DEFAULT);
                 if (!result) {
                     UIUtils.showToast("切歌失败");
                 }
@@ -575,7 +611,13 @@ public class MusicActivity extends BaseActivity implements View.OnClickListener 
                 if (scrollState == AbsListView.OnScrollListener.SCROLL_STATE_IDLE) {
                     if (view.getLastVisiblePosition() >= view.getCount() - 2) {
                         try {
-                            mMusicService.getMoreList(sessionId);
+                            mMusicService.getMoreList(sessionId, false);
+                        } catch (RemoteException e) {
+                            e.printStackTrace();
+                        }
+                    } else if (view.getFirstVisiblePosition() < 2) {
+                        try {
+                            mMusicService.getMoreList(sessionId, true);
                         } catch (RemoteException e) {
                             e.printStackTrace();
                         }
@@ -586,6 +628,16 @@ public class MusicActivity extends BaseActivity implements View.OnClickListener 
             @Override
             public void onScroll(AbsListView view, int firstVisibleItem, int visibleItemCount, int totalItemCount) {
 
+            }
+        });
+        mListViewHistory.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+            @Override
+            public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+                boolean result = XWeiControl.getInstance().
+                        getMediaTool().txcPlayerControl(sessionId, Constants.XWeiControlCode.PLAYER_PLAY, position, XWCommonDef.ResourceListType.HISTORY);
+                if (!result) {
+                    UIUtils.showToast("切歌失败");
+                }
             }
         });
     }
@@ -602,13 +654,6 @@ public class MusicActivity extends BaseActivity implements View.OnClickListener 
     protected void onResume() {
         super.onResume();
         mHandler.post(mTimerRunnable);
-        AudioManager mAudioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
-        if (XWeiAudioFocusManager.getInstance().needRequestFocus(AudioManager.AUDIOFOCUS_GAIN)) {
-            int ret = mAudioManager.requestAudioFocus(DemoOnAudioFocusChangeListener.getInstance(), AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN);
-            if (ret == AudioManager.AUDIOFOCUS_REQUEST_GRANTED) {
-                XWeiAudioFocusManager.getInstance().setAudioFocusChange(AudioManager.AUDIOFOCUS_GAIN);
-            }
-        }
     }
 
     @Override
@@ -728,7 +773,7 @@ public class MusicActivity extends BaseActivity implements View.OnClickListener 
     }
 
     protected void playFavorite() {
-        XWSDK.getInstance().request(XWCommonDef.RequestType.TEXT, "播放我收藏的音乐".getBytes(), new XWContextInfo());
+        XWSDK.getInstance().request(XWCommonDef.RequestType.TEXT, "播放我收藏的音乐".getBytes());
     }
 
     private void playMusic() {
@@ -860,5 +905,15 @@ public class MusicActivity extends BaseActivity implements View.OnClickListener 
         }
         sb.append(sec);
         return sb.toString();
+    }
+
+    public void switchDefaultList(View v) {
+        mListView.setVisibility(View.VISIBLE);
+        mListViewHistory.setVisibility(View.GONE);
+    }
+
+    public void switchHistoryList(View v) {
+        mListView.setVisibility(View.GONE);
+        mListViewHistory.setVisibility(View.VISIBLE);
     }
 }

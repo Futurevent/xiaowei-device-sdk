@@ -168,6 +168,11 @@ Java_com_tencent_xiaowei_control_OpusDecoder_decoder(JNIEnv *env, jclass service
             memset(pOutBuffer, 0, 960 * 6 * 2);
             int length = g_decoderMgr.Decode(id, reinterpret_cast<const unsigned char *>(pBuffer),
                                              nBufLen, pOutBuffer);
+            if(length <=0 ){
+                delete[]pOutBuffer;
+                delete[]pBuffer;
+                return NULL;
+            }
             jbyteArray jbuf = env->NewByteArray(length);
             env->SetByteArrayRegion(jbuf, 0, length, (jbyte *) pOutBuffer);
 

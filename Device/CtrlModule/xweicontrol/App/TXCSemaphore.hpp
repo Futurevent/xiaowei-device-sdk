@@ -18,6 +18,9 @@
 #define TXCSemaphore_hpp
 
 #include <semaphore.h>
+#ifdef OS_MAC
+#include <dispatch/dispatch.h>
+#endif
 
 class TXCSemaphore
 {
@@ -26,6 +29,7 @@ class TXCSemaphore
     ~TXCSemaphore();
 
     int Wait();
+    int Wait(unsigned long long time_ms);
     int Try();
     int Post();
 
@@ -35,10 +39,16 @@ class TXCSemaphore
     const TXCSemaphore &operator=(TXCSemaphore &other);
 
   private:
+
+    
+#ifdef OS_MAC
+    dispatch_semaphore_t semaphore;
+
+#else
     sem_t sem_;
     sem_t *psem_;
-
     char sem_name_[32];
+#endif
 };
 
 #endif /* TXCSemaphore_hpp */

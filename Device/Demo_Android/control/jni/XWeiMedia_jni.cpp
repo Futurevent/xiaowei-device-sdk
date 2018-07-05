@@ -86,24 +86,21 @@ Java_com_tencent_xiaowei_control_XWeiMedia_txcGetPlayerInfo(JNIEnv *env, jclass 
                     jfieldID fld_status = penv->GetFieldID(cls_info, "status", "I");
                     jfieldID fld_repeatMode = penv->GetFieldID(cls_info, "repeatMode", "I");
 
-                    jfieldID fld_playlist_id = penv->GetFieldID(cls_info, "playlistId", "I");
+                    jfieldID fld_playlist_id = penv->GetFieldID(cls_info, "sessionId", "I");
 
                     jfieldID fld_volume = penv->GetFieldID(cls_info, "volume", "I");
-                    jfieldID fld_qulity = penv->GetFieldID(cls_info, "quality", "I");
 
                     if (fld_status && fld_repeatMode
                         && fld_playlist_id
-                        && fld_volume && fld_qulity) {
+                        && fld_volume) {
                         penv->SetIntField(result_info, fld_status, player_info->status);
                         penv->SetIntField(result_info, fld_repeatMode, player_info->repeatMode);
 
-                        penv->SetIntField(result_info, fld_playlist_id, player_info->playlist_id);
+                        penv->SetIntField(result_info, fld_playlist_id, player_info->session);
 
                         penv->SetIntField(result_info, fld_volume, player_info->volume);
-                        penv->SetIntField(result_info, fld_qulity, player_info->qulity);
                     }
 
-                    //  TODO:  release local ref of result_info???
                 }
 
                 penv->DeleteLocalRef(cls_info);
@@ -123,7 +120,7 @@ Java_com_tencent_xiaowei_control_XWeiMedia_txcGetPlaylistInfo(JNIEnv *env, jclas
         return result_info;
     }
 
-    const txc_playlist_t *playlist_info = txc_get_medialist_info(player_info->playlist_id);
+    const txc_playlist_t *playlist_info = txc_get_medialist_info(player_info->session);
 
     if (playlist_info == NULL) {
         return result_info;
@@ -138,20 +135,20 @@ Java_com_tencent_xiaowei_control_XWeiMedia_txcGetPlaylistInfo(JNIEnv *env, jclas
                                                             "I");
                 jfieldID fld_type = penv->GetFieldID(g_class_play_list_info, "type", "I");
                 jfieldID fld_count = penv->GetFieldID(g_class_play_list_info, "count", "I");
-                jfieldID fld_hasMore = penv->GetFieldID(g_class_play_list_info, "hasMore", "Z");
+                jfieldID fld_hasMoreCurrent = penv->GetFieldID(g_class_play_list_info, "hasMoreCurrent", "Z");
+                jfieldID fld_hasMoreCurrentUp = penv->GetFieldID(g_class_play_list_info, "hasMoreCurrentUp", "Z");
+                jfieldID fld_hasMoreHistory = penv->GetFieldID(g_class_play_list_info, "hasMoreHistory", "Z");
+                jfieldID fld_hasMoreHistoryUp = penv->GetFieldID(g_class_play_list_info, "hasMoreHistoryUp", "Z");
+                jfieldID fld_hasHistory = penv->GetFieldID(g_class_play_list_info, "hasHistory", "Z");
 
-                __android_log_print(ANDROID_LOG_DEBUG, "XWeiControlJNI_",
-                                    "Java_com_tencent_xiaowei_control_XWeiMedia_txcGetPlaylistInfo, %d",
-                                    playlist_info->hasMore);
-
-                if (fld_playlist_id
-                    && fld_type && fld_count && fld_hasMore) {
-                    penv->SetIntField(result_info, fld_playlist_id, playlist_info->playlist_id);
-                    penv->SetIntField(result_info, fld_type, playlist_info->type);
-                    penv->SetIntField(result_info, fld_count, playlist_info->count);
-                    penv->SetBooleanField(result_info, fld_hasMore,
-                                          (jboolean) playlist_info->hasMore);
-                }
+                penv->SetIntField(result_info, fld_playlist_id, playlist_info->playlist_id);
+                penv->SetIntField(result_info, fld_type, playlist_info->type);
+                penv->SetIntField(result_info, fld_count, playlist_info->count);
+                penv->SetBooleanField(result_info, fld_hasMoreCurrent, (jboolean) playlist_info->has_more_current);
+                penv->SetBooleanField(result_info, fld_hasMoreCurrentUp, (jboolean) playlist_info->has_more_current_up);
+                penv->SetBooleanField(result_info, fld_hasMoreHistory, (jboolean) playlist_info->has_more_history);
+                penv->SetBooleanField(result_info, fld_hasMoreHistoryUp, (jboolean) playlist_info->has_more_history_up);
+                penv->SetBooleanField(result_info, fld_hasHistory, (jboolean) playlist_info->has_history);
             }
         }
     }

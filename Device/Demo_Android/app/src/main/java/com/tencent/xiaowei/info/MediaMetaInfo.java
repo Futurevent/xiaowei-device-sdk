@@ -26,15 +26,15 @@ import com.tencent.xiaowei.util.JsonUtil;
  * 媒体meta信息
  */
 public class MediaMetaInfo implements Parcelable {
-    public String name;
-    public String artist;
-    public String album;
-    public String cover;
-    public int duration;
-    public boolean favorite;
-    public String lyric;
-    public int quality;
-    public String playId;
+    public String name;// 歌曲名
+    public String artist;// 歌手名
+    public String album;// 专辑
+    public String cover;// 图片
+    public int duration;// 时长
+    public boolean favorite;// 是否被收藏
+    public String lyric;// 歌词
+    public int quality;// 清晰度
+    public String playId;// 资源Id
 
     public MediaMetaInfo() {
     }

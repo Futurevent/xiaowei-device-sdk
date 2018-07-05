@@ -22,7 +22,6 @@ import android.media.AudioTrack;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
-import android.widget.Toast;
 
 import com.tencent.xiaowei.util.QLog;
 
@@ -123,12 +122,22 @@ public class PcmPlayer extends BasePlayer {
         QLog.d(TAG, "prepareAsync");
         int minBufSize = AudioTrack.getMinBufferSize(mAudioParam.mFrequency,
                 mAudioParam.mChannel, mAudioParam.mSampBit);
+        if (mAudioTrack != null) {
+            try {
+                mAudioTrack.release();
+            } catch (Exception e) {
+            }
+        }
         mAudioTrack = new AudioTrack(AudioManager.STREAM_MUSIC, mAudioParam.mFrequency,
                 mAudioParam.mChannel, mAudioParam.mSampBit,
                 minBufSize, AudioTrack.MODE_STREAM, mSessionId);
 
         if (AudioTrack.STATE_INITIALIZED != mAudioTrack.getState()) {
-            Log.e(TAG, "AudioTrack state is not AudioTrack.STATE_INITIALIZED. the state is" + mAudioTrack.getState());
+            Log.e(TAG, "AudioTrack state is not AudioTrack.STATE_INITIALIZED. the state is " + mAudioTrack.getState());
+
+            mAudioTrack = null;
+            notifyOnError(PLAY_ERROR, 1);
+            return;
         }
 
         if (mLooperThread == null) {
@@ -139,7 +148,6 @@ public class PcmPlayer extends BasePlayer {
             mAudioTrack.play();
             notifyOnPrepared();
         } catch (Exception e) {
-            e.printStackTrace();
             notifyOnError(PLAY_ERROR, 0);
         }
 
@@ -231,9 +239,13 @@ public class PcmPlayer extends BasePlayer {
         if (mAudioTrack != null) {
             try {
                 mAudioTrack.stop();
+            } catch (Exception e) {
+            }
+            try {
                 mAudioTrack.release();
                 mAudioTrack = null;
             } catch (Exception e) {
+                mAudioTrack = null;
                 e.printStackTrace();
                 notifyOnError(PAUSE_ERROR, 0);
             }

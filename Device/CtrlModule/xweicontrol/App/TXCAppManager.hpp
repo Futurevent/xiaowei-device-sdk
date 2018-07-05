@@ -20,43 +20,53 @@
 //////////////////// interface of AudioApp.h ////////////////////
 #include "TXSDKCommonDef.h"
 #include "AudioApp.hpp"
+#include <pthread.h>
+
+class ThreadChecker
+{
+public:
+  ThreadChecker();
+  void Check();
+
+private:
+  pthread_t thread_id_;
+};
+#define THREAD_CHECKER ThreadChecker debug_thread_checker_;
+#define Thread_Check debug_thread_checker_.Check();
 
 class TXCAppManager
 {
-  public:
-    TXCAppManager();
-    ~TXCAppManager();
+public:
+  TXCAppManager();
+  ~TXCAppManager();
 
-    // 收到一个响应
-    void OnAiAudioRsp(TXCA_PARAM_RESPONSE &cRsp);
+  // 收到一个响应
+  void OnAiAudioRsp(TXCA_PARAM_RESPONSE &cRsp);
     
-    // 收到一个静音通知
-    void OnSilence(int errCode);
+  const std::vector<int> &GetAllApp();
 
-    const std::vector<int> &GetAllApp();
+  // 根据session获取skill信息
+  const txc_session_info *GetSessionInfo(SESSION id);
 
-    // 根据session获取skill信息
-    const txc_session_info *GetSessionInfo(SESSION id);
+  bool OnMessage(SESSION id, XWM_EVENT event, XWPARAM arg1, XWPARAM arg2);
 
-    bool OnMessage(SESSION id, XWM_EVENT event, XWPARAM arg1, XWPARAM arg2);
+public:
+  txc_xwei_control callback_;
 
-  public:
-    txc_xwei_control callback_;
+private:
+  //  return true if responce handled, otherwise return false;
+  bool ProcessRsp(const TXCA_PARAM_RESPONSE &cRsp);
+  void DumpAppStack(std::string tag);
+  CAudioApp *NewApp(const TXCA_PARAM_RESPONSE &cRsp);
+  bool DeleteApp(SESSION process_id);
+  void OrderAppIds(SESSION process_id);
 
-  private:
-    //  return true if responce handled, otherwise return false;
-    bool ProcessRsp(const TXCA_PARAM_RESPONSE &cRsp);
-    void DumpAppStack(std::string tag);
-    CAudioApp *NewApp(const TXCA_PARAM_RESPONSE &cRsp);
-    bool DeleteApp(SESSION process_id);
-    void OrderAppIds(SESSION process_id);
+  void Clear();
 
-    void Clear();
+  std::map<int, CAudioApp *> app_list_; //  app id => app
+  std::vector<int> app_id_list_;        //  app ids
 
-    std::map<int, CAudioApp *> app_list_; //  app id => app
-    std::vector<int> app_id_list_;              //  app ids
-
-    THREAD_CHECKER;
+  THREAD_CHECKER;
 };
 
 class TXCWakeupStatus

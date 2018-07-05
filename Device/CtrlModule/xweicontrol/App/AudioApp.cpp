@@ -19,23 +19,22 @@
 #include <cassert>
 #include <memory.h>
 #include "AudioApp.hpp"
-#include "AppSkill.hpp"
 #include "txctypedef.h"
 #include "TXCServices.hpp"
 #include "OuterSkillMgr.h"
-#include "TXCSkillsDefineEx.h"
+#include "TXCSkillsDefine.h"
 #include "logger.h"
-#include "AppkitMsgbox.hpp"
 #include "Util.hpp"
 
-AppSkill* CAudioApp::notify_app_ = NULL;
+AppSkill *CAudioApp::notify_app_ = NULL;
 
 CAudioApp::CAudioApp(int process_id)
     : process_id_(process_id), strategy_(NULL)
 {
     info_.skill_id = NULL;
     info_.skill_name = NULL;
-    if(!notify_app_) {
+    if (!notify_app_)
+    {
         notify_app_ = new AppKitNotify(Util::GetNewProcessId());
     }
 }
@@ -76,14 +75,6 @@ void CAudioApp::SetAppType(const TXCA_PARAM_RESPONSE &cRsp)
         else if (DEF_TXCA_SKILL_ID_FM == skill_id)
         {
             strategy_ = new AppKitFM(process_id_);
-        }
-        else if (DEF_TXCA_SKILL_ID_MSGBOX == skill_id)
-        {
-            strategy_ = new AppkitMsgbox(process_id_);
-        }
-        else if (DEF_TXCA_SKILL_ID_QQMSG == skill_id)
-        {
-            strategy_ = new AppkitQQMsg(process_id_);
         }
         else if (DEF_TXCA_SKILL_ID_WIKI == skill_id
                  || DEF_TXCA_SKILL_ID_DATETIME == skill_id
@@ -135,7 +126,8 @@ const txc_session_info &CAudioApp::GetInfo()
 
 const std::string CAudioApp::GetAppType()
 {
-    if(strategy_) {
+    if (strategy_)
+    {
         return strategy_->GetClassName();
     }
     return skill_id_;
@@ -155,7 +147,8 @@ bool CAudioApp::OnAiAudioRsp(const TXCA_PARAM_RESPONSE &cRsp)
         {
             // 给AppSkill处理，它会返回是否想要处理
             handled = strategy_->OnAiAudioRsp(cRsp);
-            if(handled) {
+            if (handled)
+            {
                 // 更新skillinfo
                 std::string skill_name = cRsp.skill_info.name ? cRsp.skill_info.name : "";
                 if (skill_name.find("通用控制") == std::string::npos)
@@ -164,24 +157,30 @@ bool CAudioApp::OnAiAudioRsp(const TXCA_PARAM_RESPONSE &cRsp)
                     {
                         skill_id_ = cRsp.skill_info.id;
                         info_.skill_id = skill_id_.c_str();
-                    } else {
-//                        skill_id_ = "";
-//                        info_.skill_id = "";
                     }
-                    
+                    else
+                    {
+                        //                        skill_id_ = "";
+                        //                        info_.skill_id = "";
+                    }
+
                     if (cRsp.skill_info.name && cRsp.skill_info.name[0])
                     {
                         skill_name_ = cRsp.skill_info.name;
                         info_.skill_name = skill_name_.c_str();
-                    } else {
-//                        skill_name_ = "";
-//                        info_.skill_name = "";
+                    }
+                    else
+                    {
+                        //                        skill_name_ = "";
+                        //                        info_.skill_name = "";
                     }
                 }
             }
             TLOG_DEBUG("sessionId=%d CAudioApp::OnAiAudioRsp finished, handled[%d] skill_id_[%s] skill_name_[%s] clsname[%s].", process_id_, handled, skill_id_.c_str(), skill_name_.c_str(), strategy_->GetClassName().c_str());
         }
-    } else {
+    }
+    else
+    {
         TLOG_TRACE("sessionId=%d CAudioApp::OnAiAudioRsp but IsFitAppScene false.", process_id_);
     }
 
@@ -193,10 +192,10 @@ bool CAudioApp::IsFitAppScene(const TXCA_PARAM_RESPONSE &cRsp)
 {
     bool is_fit = false;
     TLOG_DEBUG("sessionId=%d CAudioApp::IsFitAppScene skill_id[%s] skill_name[%s] cRsp=%s.", process_id_, skill_id_.c_str(), skill_name_.c_str(), Util::ToString(cRsp).c_str());
-    
+
     // 使用skill_info比较
     is_fit = CheckSkillInfo(cRsp.skill_info);
-    
+
     // 到这里，说明skill_info不足以确认是否应该放行。如果skill_info信息为空，使用last_skill_info判断。使用last_skill_info 的时候，原则上不能new新的APP来处理。
     if (!is_fit && !cRsp.skill_info.id && !cRsp.skill_info.name && !Util::IsTempRsp(cRsp))
     {
@@ -210,7 +209,7 @@ bool CAudioApp::IsFitAppScene(const TXCA_PARAM_RESPONSE &cRsp)
             is_fit = true;
         }
     }
-    
+
     return is_fit;
 }
 
@@ -228,7 +227,6 @@ bool CAudioApp::CheckSkillInfo(const TXCA_PARAM_SKILL skill_info)
         }
     }
     TLOG_TRACE("sessionId=%d CAudioApp::CheckSkillInfocRsp.skill_id[%s] cRsp.skill_name[%s] is_fit[%d].", process_id_, skill_info.id, skill_info.name, is_fit);
-    
     return is_fit;
 }
 
@@ -241,38 +239,6 @@ bool CAudioApp::OnMessage(XWM_EVENT event, XWPARAM arg1, XWPARAM arg2)
     }
 
     return handled;
-}
-
-ThreadChecker::ThreadChecker()
-{
-    thread_id_ = 0;
-}
-
-void ThreadChecker::Check()
-{
-    pthread_t id = pthread_self();
-    if (0 == thread_id_)
-    {
-        thread_id_ = id;
-    }
-    else
-    {
-        if (thread_id_ != id)
-        {
-            printf("#### error thread %ld, %ld", (long)id, (long)thread_id_);
-            assert(!"call same method from different thread!");
-        }
-    }
-}
-
-bool post_message(SESSION id, XWM_EVENT event, XWPARAM arg1, XWPARAM arg2, unsigned int delay)
-{
-    return TXCServices::instance()->GetMessageQueue()->PostMessage(id, event, arg1, arg2, delay);
-}
-
-bool send_message(SESSION id, XWM_EVENT event, XWPARAM arg1, XWPARAM arg2)
-{
-    return TXCServices::instance()->GetMessageQueue()->SendMessage(id, event, arg1, arg2);
 }
 
 SDK_API int txc_list_sessions(_Out_ SESSION *sessions, int buffer_count)
