@@ -21,7 +21,7 @@
 	
 #### 编译说明
 
-在`CtrlModule`目录，有示例编译脚本`fast_build.sh`，运行后 so 文件会输出到`CtrlModule/out`目录，其余平台可以参照 `fast_build.sh`进行脚本编写。
+在`CtrlModule`目录，有示例编译脚本`fast_build.sh`，运行后 so 文件会输出到`CtrlModule/out`目录，其余平台可以参照 `fast_build.sh`进行脚本编写。NDK版本建议使用R11C，可以避免一些编译问题。
 
 编译控制层需要依赖以下第三方库，您可以点击以下的链接跳转到相应的页面进行下载：
 
