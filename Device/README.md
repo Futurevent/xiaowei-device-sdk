@@ -30,8 +30,16 @@
 3. [RapidJson](https://github.com/Tencent/rapidjson/releases/tag/v1.1.0)：请将下载下来的开源库源码文件置于`Device/CtrlModule/library/rapidjson-1.1.0`目录下；
 4. [shared_ptr](https://github.com/SRombauts/shared_ptr)：请将下载下来的开源库源码文件置于`Device/CtrlModule/library/shared_ptr`目录下。
 
-> 注意：`Device/CtrlModule/library`目录下已经存在各个依赖库对应的目录以及编译依赖的配置文件，再进行覆盖时需要保留这些配置文件。
+> 注意：你的文件结构应该是如下图所示的(开源库更新后可能会有所变化)。
+> ![](../Img/img_xiaowei_sdk_log_c.png)
+> 
+> ![](../Img/img_xiaowei_sdk_opus.png)
+> 
+> ![](../Img/img_xiaowei_sdk_rapidjson.png)
+> 
+> ![](../Img/img_xiaowei_sdk_shared_ptr.png)
 
+在`Demo_Android`目录，有示例编译脚本`build_jni.sh`，运行后可以编译出 Android 的 jni。编译 jni 之前，注意需要下载小微 SDK 放到相应目录，并先编译出`CtrlModule`。
 ### Demo_Android 目录
 
 这个目录为 Android 的 demo。[跳转到 Android 平台接入指引](https://xiaowei.qcloud.com/wiki/#OpenSrc_Android_Demo_Guide)。
@@ -49,10 +57,6 @@
 ### Demo_Linux 目录
 
 这个目录为 Linux 的 demo。[跳转到 Linux 平台接入指引](https://xiaowei.qcloud.com/wiki/#OpenSrc_Linux_Demo_Guide)。
-
-### Demo_Mac目录
-
-这个目录为为 Mac 的 demo，项目文件位于 `projects/osx/DeviceSDKDemo.xcodeproj`。[跳转到 MacOs 平台接入指引](https://xiaowei.qcloud.com/wiki/#OpenSrc_Mac_Demo_Guide)。
 
 ### Sample 目录
 
