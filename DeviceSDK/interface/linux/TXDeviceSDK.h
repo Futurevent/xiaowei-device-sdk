@@ -42,13 +42,6 @@ enum tx_sdk_run_mode
     sdk_run_mode_low_power = 1, //低功耗模式
 };
 
-enum tx_cache_binderinfo_mode
-{
-    tx_cache_binderinfo_mode_auto = 0, // 自动模式。自动模式下，如果是android和windows平台则开启绑定者列表缓存，如果其他平台则不开启
-    tx_cache_binderinfo_mode_on,       // 开启缓存
-    tx_cache_binderinfo_mode_off,      // 禁用缓存
-};
-
 // 绑定者或者设备好友的在线状态
 enum tx_online_type
 {
@@ -82,8 +75,6 @@ typedef struct _tx_device_info
 
     unsigned int test_mode;    //测试环境标志位
     int run_mode;              //SDK运行模式，必须从枚举变量tx_sdk_run_mode中取值
-    int support_lan_av;        //IPCamera是否支持局域网音视频功能，主要供TV在局域网获取Camera的音视频数据，默认为0表示不支持，支持此必须实现TXLanAudioVideo.h里面的接口
-    int cache_binderinfo_mode; //是否在本地保存绑定者信息，当设备的授权者个数很多时，开启缓存可以加快重启进程后获取设备绑定者列表的速度
 } TX_DEVICE_INFO;
 
 //设备绑定者信息
@@ -98,6 +89,7 @@ typedef struct tag_tx_binder_info
     char head_url[1024];       //绑定者头像url
     int tinyid_type;           //0是uin, 1是qq tinyid, 2是weixin tinyid
     char open_id[48];          //小微绑定时，三方授权登录的openid, 只有主人有这个字段
+    unsigned long long xw_tinyid; //小微tinyid，和小微App端登陆成功后的tinyid一样
 } TX_BINDER_INFO;
 
 typedef struct tag_tx_binder_remark_info
@@ -130,8 +122,11 @@ typedef struct _tx_device_notify
     // binder remark list change callback
     void (*on_binder_remark_change)(int cookie, TX_BINDER_REMARK_INFO *pBinderRemarkList, int nCount);
 
-    //手Q端或者后台远程重启设备
+    //App端或者后台远程重启设备
     void (*on_device_reboot)();
+
+    //退出SDK的回调方法
+    void (*on_device_exit)();
 
 } TX_DEVICE_NOTIFY;
 

@@ -34,7 +34,7 @@ SDK_API int txca_report_state(TXCA_PARAM_STATE *state);
 SDK_API int txca_error_feed_back();
 
 /**
- * 接口说明：上报一些事件，用于计算整个链路的耗时
+ * 接口说明：上报一些事件
  * 返回值  ：错误码（见全局错误码表）
  */
 SDK_API int txca_data_report(TXCA_PARAM_LOG *log);

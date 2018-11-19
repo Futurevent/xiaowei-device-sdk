@@ -20,8 +20,8 @@ import android.util.Log;
 
 import com.tencent.aiaudio.msg.data.OnOperationFinishListener;
 import com.tencent.aiaudio.msg.data.OnQueryAllMsgListener;
-import com.tencent.aiaudio.msg.data.QQMsgDbManager;
-import com.tencent.aiaudio.msg.data.QQMsgEntry;
+import com.tencent.aiaudio.msg.data.MsgDbManager;
+import com.tencent.aiaudio.msg.data.MsgEntry;
 
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -30,7 +30,7 @@ public class MsgBoxManager implements OnQueryAllMsgListener {
     private static final String TAG = MsgBoxManager.class.getSimpleName();
     private static final MsgBoxManager ourInstance = new MsgBoxManager();
 
-    private CopyOnWriteArrayList<QQMsgEntry> msgEntries = new CopyOnWriteArrayList<>();
+    private CopyOnWriteArrayList<MsgEntry> msgEntries = new CopyOnWriteArrayList<>();
 
     public static MsgBoxManager getInstance() {
         return ourInstance;
@@ -41,38 +41,44 @@ public class MsgBoxManager implements OnQueryAllMsgListener {
     }
 
     public void init() {
-        QQMsgDbManager.getInstance().queryAllMsgItem(this);
+        MsgDbManager.getInstance().queryAllMsgItem(this);
     }
 
     /**
-     * 添加一个QQ消息
+     * 添加一个消息
      *
-     * @param entry QQ消息实体
+     * @param entry    消息实体
      * @param listener 监听器
      */
-    public void addMsg(QQMsgEntry entry, OnOperationFinishListener listener) {
+    public void addMsg(MsgEntry entry, OnOperationFinishListener listener) {
         if (entry == null) {
             return;
         }
 
         msgEntries.add(entry);
 
-        QQMsgDbManager.getInstance().addMsgItem(entry, listener);
+        MsgDbManager.getInstance().addMsgItem(entry, listener);
     }
 
 
     /**
      * 设置消息已读
+     *
      * @param msgId 消息id
      */
     public void setMsgRead(int msgId) {
-        for (QQMsgEntry entry : msgEntries) {
+        for (MsgEntry entry : msgEntries) {
             if (entry.getId() == msgId) {
                 entry.setHasRead(true);
-                QQMsgDbManager.getInstance().updateMsgItem(entry, null);
+                MsgDbManager.getInstance().updateMsgItem(entry, null);
                 break;
             }
         }
+    }
+
+    public void deleteAll() {
+        msgEntries.clear();
+        MsgDbManager.getInstance().deleteAll();
     }
 
     /**
@@ -80,10 +86,10 @@ public class MsgBoxManager implements OnQueryAllMsgListener {
      *
      * @return 下一个未读消息或null
      */
-    public QQMsgEntry getNextMsg() {
+    public MsgEntry getNextMsg() {
 
         for (int i = msgEntries.size() - 1; i >= 0; i--) {
-            QQMsgEntry entry = msgEntries.get(i);
+            MsgEntry entry = msgEntries.get(i);
             if (!entry.isHasRead()) {
                 return entry;
             }
@@ -93,12 +99,12 @@ public class MsgBoxManager implements OnQueryAllMsgListener {
     }
 
     @Override
-    public void onQueryAllMsg(List<QQMsgEntry> entries) {
+    public void onQueryAllMsg(List<MsgEntry> entries) {
         if (entries == null) {
             return;
         }
 
-        for (QQMsgEntry entry : entries) {
+        for (MsgEntry entry : entries) {
             Log.d(TAG, "onQueryAllAlarm msgId: " + entry.getId());
             msgEntries.add(entry);
         }

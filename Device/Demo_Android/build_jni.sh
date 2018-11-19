@@ -20,6 +20,7 @@ function debug_build_xwei_sdk_jni {
 function debug_build_delete_shared_jni {
 	PROGDIR=$(cd $(dirname $0); pwd -P)
 	rm $PROGDIR/xiaoweiSDK/libs/armeabi/libstlport_shared.so
+	rm $PROGDIR/xiaoweiSDK/libs/x86/libstlport_shared.so
 }
 
 function debug_build_project {

@@ -69,14 +69,14 @@ class TipPlayer : public OutSkillAudioFocusListener
     std::string tipRes;
 };
 
-// QQ消息Skill中的媒体定义
-class QQMsgMedia
+// 消息Skill中的媒体定义
+class MsgMedia
 {
 
   public:
-    QQMsgMedia();
-    QQMsgMedia(std::string content, MEDIA_TYPE type, bool isMsg, std::string id);
-    ~QQMsgMedia();
+    MsgMedia();
+    MsgMedia(std::string content, MEDIA_TYPE type, bool isMsg, std::string id);
+    ~MsgMedia();
 
   public:
     std::string content;
@@ -85,10 +85,10 @@ class QQMsgMedia
     std::string id;
 };
 
-// QQ消息Skill处理器
-class QQMsgSkillHandler : public OutSkillHandler, public FileTransferListener, public OutSkillAudioFocusListener, public CXWeiRequestListener
+// 消息Skill处理器
+class MsgSkillHandler : public OutSkillHandler, public FileTransferListener, public OutSkillAudioFocusListener, public CXWeiRequestListener
 {
-    enum QQMsgSkillState
+    enum MsgSkillState
     {
         SKILL_STATE_IDLE = 0,
         SKILL_STATE_LOOP_PLAY = 1,
@@ -97,8 +97,8 @@ class QQMsgSkillHandler : public OutSkillHandler, public FileTransferListener, p
     };
 
   public:
-    QQMsgSkillHandler();
-    ~QQMsgSkillHandler();
+    MsgSkillHandler();
+    ~MsgSkillHandler();
 
   public:
     // 实现 FileTransferListener
@@ -119,13 +119,14 @@ class QQMsgSkillHandler : public OutSkillHandler, public FileTransferListener, p
 
   public:
     // 实现CXWeiRequestListener
-    virtual bool OnRequest(TXCA_EVENT event);
+    virtual bool OnRequest(TXCA_EVENT event, TXCA_PARAM_RESPONSE *cRsp);
     virtual void OnFeedAudioData(const char *data, int length);
 
   private:
     bool processRecvMsg(TXCA_PARAM_RESPONSE *cRsp);
     bool processTextMsg(const char *content, const char *extendBuf);
     bool processAudioMsg(const char *content, const char *extendBuf);
+    bool processWechatMsg(const char *content, const char *extendBuf);
     bool processSendMsg(TXCA_PARAM_RESPONSE *cRsp);
     bool processPlayMsg(TXCA_PARAM_RESPONSE *cRsp);
     bool processException(TXCA_PARAM_RESPONSE *cRsp);
@@ -140,10 +141,10 @@ class QQMsgSkillHandler : public OutSkillHandler, public FileTransferListener, p
     int m_curState;
     int m_sessionId;
     unsigned long long m_targetId;
-    QQMsgMedia m_curMedia;
+    MsgMedia m_curMedia;
     TipPlayer *m_tipPlayer;
     pthread_mutex_t m_msgPlayListMutex;
-    std::queue<QQMsgMedia> m_msgPlayList;
+    std::queue<MsgMedia> m_msgPlayList;
 };
 
 // 用于分发本地Skill的响应数据和消息以及焦点管理

@@ -35,6 +35,11 @@ public class XWAVChatManager {
 
     private static OnAVChatEventListener mOnAVChatEventListener;
 
+    /**
+     * 设置QQ电话相关的回调监听
+     *
+     * @param listener
+     */
     public static void setOnAVChatEventListener(OnAVChatEventListener listener) {
         mOnAVChatEventListener = listener;
     }
@@ -51,7 +56,6 @@ public class XWAVChatManager {
 
     /**
      * 开启通话进程，成功之后会收到ACTION_START_AUDIO_VIDEO_PROCESS广播，sub_action为StartVideoChatActivity
-     * 只给社平用
      *
      * @param peerId 对方id
      */
@@ -65,7 +69,6 @@ public class XWAVChatManager {
 
     /**
      * 开启通话进程，成功之后会收到ACTION_START_AUDIO_VIDEO_PROCESS广播，sub_action为StartAudioChatActivity
-     * 只给社平用
      *
      * @param peerId 对方id
      */

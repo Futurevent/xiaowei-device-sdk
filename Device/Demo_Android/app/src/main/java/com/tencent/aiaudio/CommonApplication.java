@@ -32,6 +32,7 @@ import com.tencent.aiaudio.bledemo.BLEService;
 import com.tencent.aiaudio.chat.AVChatManager;
 import com.tencent.aiaudio.demo.BuildConfig;
 import com.tencent.aiaudio.demo.R;
+import com.tencent.aiaudio.msg.SkillMsgHandler;
 import com.tencent.aiaudio.player.XWeiPlayerMgr;
 import com.tencent.aiaudio.service.AIAudioService;
 import com.tencent.aiaudio.service.WakeupAnimatorService;
@@ -172,6 +173,7 @@ public class CommonApplication extends Application {
                     sendBroadcast(ACTION_ON_BINDER_LIST_CHANGE);
                     if (arrayList.size() == 0) {
                         XWeiAudioFocusManager.getInstance().abandonAllAudioFocus();// 解绑了应该停止所有的资源的播放
+                        SkillMsgHandler.getInstance().onUnBind();
                     }
                 }
             }

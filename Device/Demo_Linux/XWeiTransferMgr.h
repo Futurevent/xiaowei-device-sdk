@@ -98,16 +98,18 @@ class CXWeiTransferMgr
     void ProcessAudioMsgRecord(bool isStart);
     void ProcessAudioMsgSend(unsigned long long tinyId, FileTransferListener *listener);
 
+    void ProcessWechatAudioMsgSend(std::string toUser);
   private:
     void ResetVoiceData();
     std::string GetVoiceData();
     bool GetFileTransferInfo(unsigned long long transfer_cookie, MsgFileTransferInfo *info);
     bool EncodeVoiceDataToAmr(const std::string &strVoiceData, std::string &strFile);
     void SendMsg(unsigned long long tinyId, const std::string &strFile, unsigned int duration, unsigned int *cookie);
-
+    void UploadFile(const std::string &strFile, unsigned long long *cookie);
   private:
     std::vector<MsgFileTransferInfo> m_vecFileTransfer;
     std::map<unsigned int, FileTransferListener *> m_mapSendMsg;
+    std::map<unsigned long long, std::string> m_mapSendWechatMsg;
 
     time_t m_timeDuration;      // 录音时长
     std::string m_strVoiceData; // 语音数据

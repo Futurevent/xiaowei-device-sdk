@@ -25,7 +25,7 @@
 
 TXCSemaphore::TXCSemaphore()
 {
-#ifdef OS_MAC
+#if defined(OS_MAC) || defined(TARGET_OS_IPHONE)
     semaphore = dispatch_semaphore_create(0);
 #else
     psem_ = &sem_;
@@ -35,7 +35,7 @@ TXCSemaphore::TXCSemaphore()
 }
 TXCSemaphore::~TXCSemaphore()
 {
-#ifdef OS_MAC
+#if defined(OS_MAC) || defined(TARGET_OS_IPHONE)
     dispatch_release(semaphore);
 #else
     sem_destroy(psem_);
@@ -45,7 +45,7 @@ int TXCSemaphore::Wait()
 {
     int err = -1;
     
-#ifdef OS_MAC
+#if defined(OS_MAC) || defined(TARGET_OS_IPHONE)
     err = (int) dispatch_semaphore_wait(semaphore, DISPATCH_TIME_FOREVER);
 #else
     if (SEM_FAILED != psem_)
@@ -60,7 +60,7 @@ int TXCSemaphore::Wait(unsigned long long time_ms)
 {
     int err = -1;
 
-#ifdef OS_MAC
+#if defined(OS_MAC) || defined(TARGET_OS_IPHONE)
     dispatch_time_t  time = dispatch_time(DISPATCH_TIME_NOW, time_ms*1000*1000);
     err = (int) dispatch_semaphore_wait(semaphore, time);
 #else
@@ -87,7 +87,7 @@ int TXCSemaphore::Wait(unsigned long long time_ms)
 int TXCSemaphore::Try()
 {
     int err = -1;
-#ifdef OS_MAC
+#if defined(OS_MAC) || defined(TARGET_OS_IPHONE)
     err = (int) dispatch_semaphore_wait(semaphore, DISPATCH_TIME_NOW);
 #else
     if (SEM_FAILED != psem_)
@@ -101,7 +101,7 @@ int TXCSemaphore::Try()
 int TXCSemaphore::Post()
 {
     int err = -1;
-#ifdef OS_MAC
+#if defined(OS_MAC) || defined(TARGET_OS_IPHONE)
     err = (int) dispatch_semaphore_signal(semaphore);
 #else
     if (SEM_FAILED != psem_)

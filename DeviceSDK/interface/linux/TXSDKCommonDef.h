@@ -111,11 +111,45 @@ enum error_code
     err_ai_audio_music_not_has_law = 10015,     // 某歌曲没有版权
     err_ai_audio_music_not_find_result = 10016, // 找不到音乐资源
 
-    err_ai_audio_qqmsg_proxy_err = 10017, //开启消息代收错误码
-
-    err_ai_audio_system = 11000,            // 后台系统错误
+    // QQ消息代收
+    err_ai_audio_open_qqmsg_proxy_err = 10017, //开启消息代收错误码
+    err_ai_audio_close_qqmsg_proxy_err = 10018,//代收消息关闭失败
+    err_ai_audio_qqmsg_proxy_get_binder_err = 10019,     //代收消息获取设备绑定者失败
+    err_ai_audio_qqmsg_proxy_close_other_device_err = 10020,    //代收消息关闭其他设备代收标志失败
+    err_ai_audio_qqmsg_proxy_get_login_info_err = 10021, //代收消息获取设备登录信息失败
+    err_ai_audio_qqmsg_proxy_authority_err = 10022,       //代收消息设备无消息代收权限
+    err_ai_audio_qqmsg_proxy_push_to_qq_err = 10023, //代收消息向手Q推送授权消息失败
+    err_ai_audio_qqmsg_proxy_get_flag_err = 10025,   //代收消息获取代收标志失败
+    err_ai_audio_qqmsg_proxy_set_flag_err = 10026,   //代收消息设置代收标志失败
+    err_ai_audio_qqmsg_proxy_neednot_close = 10027,       //代收消息未开启代收无需关闭
+    
+    err_ai_audio_not_match_skill_2 = 10028,            //没有命中任何skill
+    err_ai_audio_not_matched_loginInfo = 10029,   //绑定登陆信息不匹配
+    
+    //音乐错误码
+    err_ai_audio_music_token_expired = 10038, //open登录态已过期
+    err_ai_audio_music_cannot_share = 10039,    //设备已解绑，不能再分享了
+    
+    //领取赠送音乐会员错误码
+    err_ai_audio_music_gift_vip_no_permission = 10045, //设备类型无领取权限
+    err_ai_audio_music_gift_vip_had_received = 10046, //设备已领取过赠送
+    
+    //音乐的相关错误码补充
+    err_ai_audio_music_unplayable_abroad_user = 10050, //海外用户播放受阻
+    err_ai_audio_music_unplayable_need_buy = 10051, //数字专辑需要购买才能听
+    err_ai_audio_music_unplayable_other = 10052, //不能播放其他原因
+    
+    //fm
+    err_ai_audio_fm_cannot_find = 10101,// 找不到对应的FM资源
+    
+    err_ai_audio_system_err = 11000, //后台系统错误
     err_ai_audio_no_such_person = 11030,    // 没有找到联系人，不是好友或代收好友
+    
     err_ai_audio_is_not_understand = 20001, // 没有明白你的意思
+    
+    err_ai_audio_music_share_to_self    = 21030, // 不能分享给自己
+    err_ai_audio_music_get_detail_forbid = 21031,// 频繁查详情，被加入黑名单
+    
     //...
 };
 

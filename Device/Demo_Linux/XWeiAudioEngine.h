@@ -34,7 +34,7 @@ public:
     virtual ~CXWeiRequestListener() {};
     
 public:
-    virtual bool OnRequest(TXCA_EVENT event) = 0;
+    virtual bool OnRequest(TXCA_EVENT event, TXCA_PARAM_RESPONSE *cRsp) = 0;
     virtual void OnFeedAudioData(const char *data, int length) = 0;
 };
 

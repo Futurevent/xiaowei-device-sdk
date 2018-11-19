@@ -74,6 +74,7 @@ import static com.tencent.xiaowei.control.Constants.SkillIdDef.SKILL_ID_QQ_MSG;
 import static com.tencent.xiaowei.control.Constants.SkillIdDef.SKILL_ID_TRIGGER_ALARM;
 import static com.tencent.xiaowei.control.Constants.SkillIdDef.SKILL_ID_Unknown;
 import static com.tencent.xiaowei.control.Constants.SkillIdDef.SKILL_ID_WEATHER;
+import static com.tencent.xiaowei.control.Constants.SkillIdDef.SKILL_ID_WECHAT_MSG;
 import static com.tencent.xiaowei.control.Constants.SkillIdDef.SKILL_ID_WIKI_AI_LAB;
 import static com.tencent.xiaowei.control.Constants.SkillIdDef.SKILL_ID_WIKI_Calculator;
 import static com.tencent.xiaowei.control.Constants.SkillIdDef.SKILL_ID_WIKI_HISTORY;
@@ -113,8 +114,6 @@ public class ControlService extends Service implements XWeiPlayerMgr.SkillUIEven
 
     private AudioManager.OnAudioFocusChangeListener listener;
     private AlarmSkillHandler alarmSkillHandler; // 处理AlarmSkillHandler
-    private SkillMsgHandler msgHandler;         // 消息发送/播放处理
-
 
     @Override
     public void onCreate() {
@@ -122,10 +121,10 @@ public class ControlService extends Service implements XWeiPlayerMgr.SkillUIEven
 
         XWeiPlayerMgr.setPlayerEventListener(this);
         alarmSkillHandler = new AlarmSkillHandler(getApplicationContext());
-        msgHandler = new SkillMsgHandler(getApplicationContext());
         XWeiControl.getInstance().getXWeiOuterSkill().registerSkillIdOrSkillName(SKILL_ID_ALARM, alarmSkillHandler);
         XWeiControl.getInstance().getXWeiOuterSkill().registerSkillIdOrSkillName(SKILL_ID_TRIGGER_ALARM, alarmSkillHandler);
-        XWeiControl.getInstance().getXWeiOuterSkill().registerSkillIdOrSkillName(SKILL_ID_QQ_MSG, msgHandler);
+        XWeiControl.getInstance().getXWeiOuterSkill().registerSkillIdOrSkillName(SKILL_ID_QQ_MSG, SkillMsgHandler.getInstance());
+        XWeiControl.getInstance().getXWeiOuterSkill().registerSkillIdOrSkillName(SKILL_ID_WECHAT_MSG, SkillMsgHandler.getInstance());
 
         DeviceSkillAlarmManager.instance().init(getApplication());
         DeviceSkillAlarmManager.instance().startDeviceAllAlarm();
@@ -145,6 +144,7 @@ public class ControlService extends Service implements XWeiPlayerMgr.SkillUIEven
         XWeiControl.getInstance().getXWeiOuterSkill().unRegisterSkillIdOrSkillName(SKILL_ID_ALARM);
         XWeiControl.getInstance().getXWeiOuterSkill().unRegisterSkillIdOrSkillName(SKILL_ID_TRIGGER_ALARM);
         XWeiControl.getInstance().getXWeiOuterSkill().unRegisterSkillIdOrSkillName(SKILL_ID_QQ_MSG);
+        XWeiControl.getInstance().getXWeiOuterSkill().unRegisterSkillIdOrSkillName(SKILL_ID_WECHAT_MSG);
     }
 
     @Override

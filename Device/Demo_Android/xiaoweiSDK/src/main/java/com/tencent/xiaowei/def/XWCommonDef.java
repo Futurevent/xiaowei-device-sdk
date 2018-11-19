@@ -49,6 +49,10 @@ public class XWCommonDef {
          * 请求收到响应
          */
         int ON_RESPONSE = 5;
+        /**
+         * 请求收到中间响应
+         */
+        int ON_RESPONSE_INTERMEDIATE = 7;
     }
 
     public interface DEVICE_INFO_PROP {
@@ -638,24 +642,105 @@ public class XWCommonDef {
         int MUSIC_NOT_FIND_RESULT = 10016;
 
         /**
+         * 开启消息代收错误码
+         */
+        int QQ_MSG_PROXY_OPEN = 10017;
+
+        /**
+         * 代收消息关闭失败
+         */
+        int QQ_MSG_PROXY_CLOSE = 10018;
+
+        /**
+         * 代收消息获取设备绑定者失败
+         */
+        int QQ_MSG_PROXY_GET_BINDER = 10019;
+
+        /**
+         * 代收消息关闭其他设备代收标志失败
+         */
+        int QQ_MSG_PROXY_CLOSE_OTHER_DEVICE = 10020;
+        /**
+         * 代收消息获取设备登录信息失败
+         */
+        int QQ_MSG_PROXY_GET_LOGIN_INFO = 10021;
+        /**
+         * 代收消息设备无消息代收权限
+         */
+        int QQ_MSG_PROXY_AUTHORITY = 10022;
+        /**
+         * 代收消息向手Q推送授权消息失败
+         */
+        int QQ_MSG_PROXY_PUSH_TO_QQ = 10023;
+        /**
+         * 代收消息获取代收标志失败
+         */
+        int QQ_MSG_PROXY_GET_FLAG = 10025;
+        /**
+         * 代收消息设置代收标志失败
+         */
+        int QQ_MSG_PROXY_SET_FLAG = 10026;
+        /**
+         * 代收消息未开启代收无需关闭
+         */
+        int QQ_MSG_PROXY_NEEDNOT_CLOSE = 10027;
+
+        /**
          * 重新授予登录态不是主人
          */
         int LOGIN_STATUS_NOT_BINDER = 10029;
 
+        /**
+         * open登录态已过期
+         */
+        int MUSIC_TOKEN_EXPIRED = 10038;
+        /**
+         * 设备已解绑，不能再分享了
+         */
+        int MUSIC_CANNOT_SHARE = 10039;
+        /**
+         * 设备类型无领取音乐会员权限
+         */
+        int MUSIC_GIFT_VIP_NO_PERMISSION = 10045;
+        /**
+         * 设备已领取过赠送音乐会员
+         */
+        int MUSIC_GIFT_VIP_HAD_RECEIVED = 10046;
+        /**
+         * 海外用户播放受阻
+         */
+        int MUSIC_UNPLAYABLE_ABROAD_USER = 10050;
+        /**
+         * 数字专辑需要购买才能听
+         */
+        int MUSIC_UNPLAYABLE_NEED_BUY = 10051;
+        /**
+         * 不能播放其他原因
+         */
+        int MUSIC_UNPLAYABLE_OTHERS = 10052;
+        /**
+         * 找不到对应的FM资源
+         */
+        int FM_CANNOT_FIND = 10101;
 
         /**
          * 后台系统错误
          */
         int SERVER_ERR = 11000;
-        /**
-         * 请求发送失败
-         */
-        int REQ_SEND_ERR = 131073;
 
         /**
-         * 发送请求后，后台一直不响应
+         * 没有找到联系人，不是好友或代收好友
          */
-        int TIMEOUT = 131074;
+        int NO_SUCH_CONTACT = 11030;
+
+        /**
+         * 不能分享给自己
+         */
+        int MUSIC_CANNOT_SHARE_TO_SELF = 21030;
+        /**
+         * 频繁查详情，被加入黑名单。
+         */
+        int GET_MUSIC_DETAIL_FORBID = 21031;
     }
 
 }

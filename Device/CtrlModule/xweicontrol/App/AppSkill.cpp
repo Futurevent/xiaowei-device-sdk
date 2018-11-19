@@ -41,13 +41,13 @@ AppSkill::AppSkill(int app_id)
 }
 
 PlayerKit::PlayerKit(int app_id)
-    : AppSkill(app_id), m_is_need_play(false), m_isRecovery(false)
+    : AppSkill(app_id), m_is_need_play(false), m_isRecovery(false), m_isAddedAlbum(false)
 {
     control_.reset(new CSkillControl(app_id, REPEAT_SEQUENCE));
 }
 
 PlayerKit::PlayerKit(int app_id, REPEAT_MODE repeat_mode)
-    : AppSkill(app_id), m_is_need_play(false), m_isRecovery(false)
+    : AppSkill(app_id), m_is_need_play(false), m_isRecovery(false), m_isAddedAlbum(false)
 {
     control_.reset(new CSkillControl(app_id, repeat_mode));
 }
@@ -291,6 +291,10 @@ void PlayerKit::ProcessPlayList(const TXCA_PARAM_RESPONSE &cRsp, bool &handled)
                 playListInfo.has_more_history = playListInfo.has_history && cRsp.has_more_playlist;
             }
             mediaList->SetInfo(&playListInfo);
+            
+            // 清理一些保存的成员变量
+            m_isAddedAlbum = false;
+            m_isRecovery = false;
         }
         
         org_playlist_count = control_->PlayListCount((int)cRsp.resource_list_type);
@@ -313,11 +317,12 @@ void PlayerKit::ProcessPlayList(const TXCA_PARAM_RESPONSE &cRsp, bool &handled)
         added_count += AddList(cRsp, media_album, index_album);
         new_playlist_count = control_->PlayListCount((int)cRsp.resource_list_type);
 
-        //  如果是第一次在某个场景新增资源，那么需要通知UI层展示UI，并初始化一些值
+        //  如果是第一次在某个场景新增可显示的资源，那么需要通知UI层展示UI，并初始化一些值
         if (!isNotify && index_album >= 0 && media_album.get())
         {
             send_message(app_id_, XWM_ALBUM_ADDED, XWPARAM((long)index_album), XWPARAM(0));
             
+            m_isAddedAlbum = true;
             m_isRecovery = cRsp.is_recovery;
         }
         TLOG_DEBUG("sessionId=%d OnAiAudioRsp %s::ProcessPlayList after AddList type=%d index_album=%d added_count=%d new_playlist_count=%d org_playlist_count=%d has_history=%d", app_id_, GetClassName().c_str(), cRsp.resource_list_type, index_album, added_count, new_playlist_count, org_playlist_count, cRsp.has_history_playlist);
@@ -418,7 +423,6 @@ size_t PlayerKit::AddList(const TXCA_PARAM_RESPONSE &cRsp, _Out_ PtrMedia &album
         return 0;
     }
 
-    bool isNeedAlbum = !isUp && (control_->PlayListCount(txca_playlist_type_default) == 0) && cRsp.resource_list_type == txca_playlist_type_default;
     std::vector<txc_play_item_t> playlist;
     size_t media_add_count = 0;
 
@@ -441,7 +445,7 @@ size_t PlayerKit::AddList(const TXCA_PARAM_RESPONSE &cRsp, _Out_ PtrMedia &album
                     play_item.group[nIndex] = src_index;
                     play_item.count++;
 
-                    if (isNeedAlbum && album_index < 0 && CanBeAlbum(media))
+                    if (cRsp.resource_list_type == txca_playlist_type_default && !m_isAddedAlbum && album_index < 0 && CanBeAlbum(media))
                     {
                         album_index = src_index;
                         album = media;

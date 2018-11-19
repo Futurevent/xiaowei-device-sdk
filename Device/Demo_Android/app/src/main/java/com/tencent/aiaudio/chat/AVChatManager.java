@@ -161,8 +161,6 @@ public class AVChatManager {
                     } catch (Exception e) {
                         QLog.d(TAG, e.getMessage());
                     }
-                    long uin = bundle.getLong("uin", 0);
-                    startQQCallSkill(false, uin);
                     mIsInvited = false;
                 } else {
                     Integer uinType = bundle.getInt("uinType", 0);
@@ -314,14 +312,6 @@ public class AVChatManager {
                 if (ret == AudioManager.AUDIOFOCUS_REQUEST_GRANTED) {
                     qqCallListener.onAudioFocusChange(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT);
                 }
-            } else if (QQCALL_CALL_OUT == command) {
-                qqCallListener = new AudioManager.OnAudioFocusChangeListener() {
-                    @Override
-                    public void onAudioFocusChange(int focusChange) {
-
-                    }
-                };
-                CommonApplication.mAudioManager.requestAudioFocus(qqCallListener, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN_TRANSIENT);
             }
 
             return true;
@@ -617,6 +607,8 @@ public class AVChatManager {
 
     /**
      * 挂断语音通话
+     *
+     * @param isAudioOp 是否为语音操作
      */
     public void closeAudioChat(boolean isAudioOp) {
         if (mIXWAudioChatService != null) {
@@ -654,11 +646,11 @@ public class AVChatManager {
         }
     }
 
-    public void startQQCallSkill(boolean invited, long uin) {
+    public void startQQCallSkill(long uin) {
 
         mCurrentPeerId = uin;
 
-        QLog.d(TAG, "startQQCallSkill " + invited + " " + uin);
+        QLog.d(TAG, "startQQCallSkill " + uin);
         // 收到电话比较特殊，需要模拟一个语音请求的响应给控制层。控制层会生成电话APP，回调到OuterSkill中。
 
         XWResponseInfo responseInfo = new XWResponseInfo();
@@ -670,7 +662,7 @@ public class AVChatManager {
         responseInfo.resources[0].resources = new XWResourceInfo[1];
         responseInfo.resources[0].resources[0] = new XWResourceInfo();
         responseInfo.resources[0].resources[0].format = XWCommonDef.ResourceFormat.COMMAND;
-        responseInfo.resources[0].resources[0].ID = "" + (invited ? QQCALL_BE_INVITED : QQCALL_CALL_OUT);
+        responseInfo.resources[0].resources[0].ID = "" + QQCALL_BE_INVITED;
         responseInfo.resources[0].resources[0].content = "" + uin;
 
         XWeiControl.getInstance().processResponse("", responseInfo, null);

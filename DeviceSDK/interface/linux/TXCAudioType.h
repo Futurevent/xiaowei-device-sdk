@@ -41,6 +41,8 @@ CXX_EXTERN_BEGIN
 #define TXCA_PARAM_LOG_EVENT_QQCALL_CALL_INVITE  "status_qqcall_invite"    // 被叫
 #define TXCA_PARAM_LOG_EVENT_QQCALL_ING          "status_qqcall_ing"       // 通话中
 #define TXCA_PARAM_LOG_EVENT_QQCALL_OUT          "status_qqcall_out"       // 退出通话
+#define TXCA_PARAM_LOG_EVENT_ALARM_IN          "status_alarm_in"       // 闹钟中
+#define TXCA_PARAM_LOG_EVENT_ALARM_OUT          "status_alarm_out"       // 退出闹钟
 
 // 语音请求回调on_request_callback接口相关事件定义
 typedef enum _txca_event {
@@ -51,6 +53,7 @@ typedef enum _txca_event {
     txca_event_on_recognize     = 4,    // 识别文本实时返回
     txca_event_on_response      = 5,    // 请求收到响应
     txca_event_on_tts           = 6,    // 小微后台推送的TTS信息
+    txca_event_on_response_intermediate = 7,// 中间结果响应
 } TXCA_EVENT;
 
 // 硬件设备支持属性定义

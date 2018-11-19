@@ -24,5 +24,5 @@ public interface OnOperationFinishListener {
      * @param entry   当前操作完成实体
      * @param action 当前操作意图
      */
-    void onOperationFinish(QQMsgEntry entry, String action);
+    void onOperationFinish(MsgEntry entry, String action);
 }

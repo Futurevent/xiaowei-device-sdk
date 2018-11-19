@@ -44,6 +44,7 @@ public class XWDeviceBaseManager {
     protected final static HashMap<Long, XWContactInfo> mAllFriendListCache = new HashMap<>();// 所有的XWContactInfo
     private static XWSDK.OnXWLoginListener onXWLoginListener;
     private static XWSDK.OnXWOnlineStatusListener onXWOnlineStatusListener;
+    private static XWSDK.OnXWLogoutListener onXWLogoutListener;
 
     public static long getSelfDin() {
         return XWSDKJNI.getSelfDin();
@@ -55,6 +56,17 @@ public class XWDeviceBaseManager {
 
     static void setOnXWOnlineStatusListener(XWSDK.OnXWOnlineStatusListener listener) {
         XWDeviceBaseManager.onXWOnlineStatusListener = listener;
+    }
+
+    public static void onLogout() {
+        if (onXWLogoutListener != null) {
+            onXWLogoutListener.onLogout();
+            onXWLogoutListener = null;
+        }
+    }
+
+    static void setOnXWLogoutListener(XWSDK.OnXWLogoutListener onXWLogoutListener) {
+        XWDeviceBaseManager.onXWLogoutListener = onXWLogoutListener;
     }
 
     /**

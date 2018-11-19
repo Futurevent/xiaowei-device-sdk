@@ -182,7 +182,7 @@ public class XWAVChatAIDLService extends Service {
         @Override
         public void startQQCallSkill(long uin) throws RemoteException {
             QLog.d(TAG, "requestAudioChatTips " + uin);
-            AVChatManager.getInstance().startQQCallSkill(true, uin);
+            AVChatManager.getInstance().startQQCallSkill(uin);
         }
 
         @Override

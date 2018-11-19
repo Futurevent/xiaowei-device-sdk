@@ -19,6 +19,7 @@ package com.tencent.aiaudio.activity;
 import com.tencent.aiaudio.activity.base.BaseActivity;
 import com.tencent.xiaowei.util.Singleton;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 
 public class ActivityManager {
@@ -42,14 +43,17 @@ public class ActivityManager {
     }
 
     private HashMap<Integer, BaseActivity> map = new HashMap<>();
+    private ArrayList<BaseActivity> list = new ArrayList<>();
+
 
     public void put(int sessionId, BaseActivity activity) {
         map.put(sessionId, activity);
+        list.add(activity);
     }
 
 
     public void remove(int sessionId) {
-        map.remove(sessionId);
+        list.remove(map.remove(sessionId));
     }
 
     public void finish(int sessionId) {
@@ -57,6 +61,15 @@ public class ActivityManager {
         if (activity != null) {
             activity.onSkillIdle();
         }
+        list.remove(activity);
+    }
+
+    public void finishAll() {
+        for (BaseActivity activity : list) {
+            activity.finish();
+        }
+        list.clear();
+        map.clear();
     }
 
 }

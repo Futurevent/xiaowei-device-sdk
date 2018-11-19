@@ -96,7 +96,8 @@
 struct TXCTask
 {
     //public:
-    unsigned long long when = 0;// 什么时候执行的绝对时间，单位ms，如果是0表示立刻。
+    unsigned long long when;// 什么时候执行的绝对时间，单位ms，如果是0表示立刻。
+    TXCTask():when(0) {};
     virtual ~TXCTask(){};
 
     virtual void Run() = 0;

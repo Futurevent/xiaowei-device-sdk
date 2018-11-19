@@ -21,9 +21,9 @@ import java.util.List;
 
 public interface OnQueryAllMsgListener {
     /**
-     * 查询所有QQ消息项完成后触发回调
+     * 查询所有消息项完成后触发回调
      *
-     * @param entries 所有QQ消息项列表
+     * @param entries 所有消息项列表
      */
-    void onQueryAllMsg(List<QQMsgEntry> entries);
+    void onQueryAllMsg(List<MsgEntry> entries);
 }

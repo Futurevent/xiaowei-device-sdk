@@ -159,6 +159,35 @@ void on_online_status(int old, int newStatus) {
 		}
 	}
 }
+
+/**
+ * 登出
+ * @param old
+ * @param newStatus
+ */
+void on_device_exit() {
+	__android_log_print(ANDROID_LOG_INFO, LOGFILTER, "on_device_exit");
+
+	if (tx_service) {
+		bool needRelease = false;
+		JNIEnv *env = Util_CreateEnv(&needRelease);
+		if (!env)
+			return;
+
+		jclass cls = env->GetObjectClass(tx_service);
+		jmethodID methodID = env->GetMethodID(cls, "onLogout", "()V");
+
+		if (methodID) {
+			env->CallVoidMethod(tx_service, methodID);
+		}
+
+		env->DeleteLocalRef(cls);
+
+		if (needRelease) {
+			Util_ReleaseEnv();
+		}
+	}
+}
 #ifdef __cplusplus
 }
 #endif

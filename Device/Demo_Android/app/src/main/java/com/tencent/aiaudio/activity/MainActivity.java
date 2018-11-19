@@ -58,9 +58,13 @@ import com.tencent.aiaudio.service.ControlService;
 import com.tencent.aiaudio.service.WakeupAnimatorService;
 import com.tencent.aiaudio.utils.XiaomiUtil;
 import com.tencent.xiaowei.sdk.XWDeviceBaseManager;
+import com.tencent.xiaowei.sdk.XWSDK;
 import com.tencent.xiaowei.util.QLog;
 
+import java.util.Random;
+
 import static com.tencent.aiaudio.CommonApplication.ACTION_ON_BINDER_LIST_CHANGE;
+import static com.tencent.xiaowei.info.XWBinderInfo.BINDER_TINYID_TYPE_WX;
 
 
 public class MainActivity extends BaseActivity {
@@ -153,6 +157,16 @@ public class MainActivity extends BaseActivity {
         }
     };
     AudioManager mAudioManager;
+    static String[][] words = new String[3][2];
+
+    static {
+        words[0][0] = "肆无忌惮";
+        words[0][1] = "可见渴答";
+        words[1][0] = "美日坚果";
+        words[1][1] = "拟好";
+        words[2][0] = "古建奇谈";
+        words[2][1] = "创新能丽";
+    }
 
     private void initView() {
         vGray = findViewById(R.id.v_gray);
@@ -200,26 +214,21 @@ public class MainActivity extends BaseActivity {
                     case 1:
                         XWDeviceBaseManager.unBind(null);
                         break;
-                    case 2:
-                        requestText("播放收藏的音乐");
-                        break;
                     case 3:
                         startActivity(new Intent(MainActivity.this, MusicActivity.class));
                         break;
                     case 4:  // 进入配网
                         startActivity(new Intent(MainActivity.this, WifiDecodeActivity.class));
                         break;
-                    case 5:
-                        requestText("今天天气怎么样");
-                        break;
-                    case 6:
-                        requestText("进入正式环境");
-                        break;
                     case 7: //蓝牙
                         startActivity(new Intent(MainActivity.this, BLEActivity.class));
                         break;
                     case 8: //绑定者
-                        startActivity(new Intent(MainActivity.this, BinderActivity.class));
+                        if (XWDeviceBaseManager.getBinderTinyIDType() == BINDER_TINYID_TYPE_WX) {
+                            startActivity(new Intent(MainActivity.this, WechatContactActivity.class));
+                        } else {
+                            startActivity(new Intent(MainActivity.this, BinderActivity.class));
+                        }
                         break;
                     case 9:
                         startActivity(new Intent(MainActivity.this, FMActivity.class));
@@ -227,12 +236,16 @@ public class MainActivity extends BaseActivity {
                     case 10:
                         startActivity(new Intent(MainActivity.this, NewsActivity.class));
                         break;
-                    case 11:
-                        requestText("五秒后提醒我喝水");
-                        break;
                     case 12:
                         AIAudioService.localVad = !AIAudioService.localVad;
                         CommonApplication.showToast("使用" + (AIAudioService.localVad ? "本地" : "后台") + "vad");
+                        break;
+                    case 14:
+                        XWSDK.getInstance().enableV2A(true);
+                        XWSDK.getInstance().setWordslist(0, words[new Random().nextInt(3)], null);
+                        break;
+                    default:
+                        requestText(mAdapter.getItem(position));
                         break;
                 }
             }
@@ -296,14 +309,16 @@ public class MainActivity extends BaseActivity {
         mAdapter.add("播放收藏的音乐");
         mAdapter.add("音乐");
         mAdapter.add("进入配网模式");
-        mAdapter.add("天气");
-        mAdapter.add("进入语音正式环境");
+        mAdapter.add("今天天气怎么样");
+        mAdapter.add("进入正式环境");
         mAdapter.add("蓝牙"); //7
-        mAdapter.add("绑定者");
+        mAdapter.add("联系人");
         mAdapter.add("FM");
         mAdapter.add("新闻");
-        mAdapter.add("5s后喝水");
+        mAdapter.add("五秒后提醒我喝水");
         mAdapter.add("vad切换");
+        mAdapter.add("播放周杰伦的稻香");
+        mAdapter.add("可见可达");
 
         mAdapter.notifyDataSetChanged();
     }

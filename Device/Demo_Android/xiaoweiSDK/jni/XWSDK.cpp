@@ -193,7 +193,7 @@ extern void on_binder_remark_change_callback(int cookie, TX_BINDER_REMARK_INFO *
 extern void on_wlan_upload_register_info_success(int errcode);
 extern void on_connected_server(int error_code);
 extern void on_register(int error_code, int sub_error_code, unsigned long long din);
-
+extern void on_device_exit();
 extern void on_receive_video_push(char * pBuf, int uLen, unsigned long long sendUin, int sendUinType);
 
 //文件传输的相关回调
@@ -364,6 +364,7 @@ JNIEXPORT jint JNICALL Java_com_tencent_xiaowei_sdk_XWSDKJNI_init
     notify.on_binder_remark_change = on_binder_remark_change_callback;
     notify.on_connected_server      = on_connected_server;
     notify.on_register      = on_register;
+    notify.on_device_exit = on_device_exit;
 
     TX_INIT_PATH init_path = {0};
     init_path.system_path = (char *) sys_path;
@@ -418,6 +419,11 @@ JNIEXPORT jint JNICALL Java_com_tencent_xiaowei_sdk_XWSDKJNI_init
     return ret;
 }
 
+JNIEXPORT jint JNICALL Java_com_tencent_xiaowei_sdk_XWSDKJNI_unInit
+        (JNIEnv *env, jobject service)
+{
+    tx_exit_device();
+}
 /**
  * 重新连接服务器
  * @param env

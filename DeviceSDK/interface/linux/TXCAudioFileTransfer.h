@@ -130,11 +130,18 @@ typedef struct tag_tx_file_transfer_notify
 } TXCA_FILE_TRANSFER_NOTIFY;
 
 /**
-* 初始化传文件
-*   notify : 回调
-*   path_recv_file : 接收文件的目录
-*/
+ * 初始化文件传输模块
+ *   notify : 回调
+ *   path_recv_file : 接收文件的目录
+ */
 SDK_API int txca_init_file_transfer(TXCA_FILE_TRANSFER_NOTIFY notify, char *path_recv_file);
+
+/**
+ * 反初始化文件传输模块
+ *   notify : 回调
+ *   path_recv_file : 接收文件的目录
+ */
+SDK_API int txca_uninit_file_transfer();
 
 /**
 * 上传文件

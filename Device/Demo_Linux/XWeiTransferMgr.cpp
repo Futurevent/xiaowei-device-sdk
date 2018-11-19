@@ -17,6 +17,9 @@
 
 #include "XWeiTransferMgr.h"
 #include "TXCAudioMsg.h"
+#include "TXCAudioFileTransfer.h"
+#include <sstream>
+#include "TXCAudioCommon.h"
 
 CXWeiTransferMgr g_xwei_transfer_mgr;
 
@@ -51,6 +54,10 @@ void on_xwei_send_msg_ret(const unsigned int cookie, int err_code)
     g_xwei_transfer_mgr.OnSendMsgResult(cookie, err_code);
 }
 
+void on_request_cmd_send_msg(const char* voice_id, int err_code, const char * json) {
+
+}
+
 CXWeiTransferMgr::CXWeiTransferMgr() : m_timeDuration(0),
                                        m_bStartRecord(false)
 {
@@ -70,6 +77,7 @@ void CXWeiTransferMgr::Init()
     txca_init_file_transfer(transfer_notify, "./");
 
     txca_set_auto_download_callbak(txca_on_auto_download_callback);
+
 }
 
 void CXWeiTransferMgr::ProcessDownloadMsgFile(txc_download_msg_data_t *data, FileTransferListener *listener)
@@ -99,6 +107,28 @@ void CXWeiTransferMgr::OnDownloadFileComplete(unsigned long long transfer_cookie
     if (NULL == tran_info)
     {
         printf("OnDownloadFileComplete cookie:%llu tran_info empty.\n", transfer_cookie);
+        return;
+    }
+    // 上传文件回调也在这里，先判断是不是微信消息上传成功了。
+
+    std::map<unsigned long long, std::string>::iterator itor = m_mapSendWechatMsg.find(transfer_cookie);
+    if (itor != m_mapSendWechatMsg.end())
+    {
+        std::string toUser = itor->second;
+        if(toUser.length() > 0) {
+
+            char szUrl[512] = {0};
+            txca_get_minidownload_url(tran_info->file_key, transfer_filetype_other, szUrl);
+            std::stringstream params;
+            params<<"{\"url\":\"";
+            params<<szUrl;
+            params<<"\",\"touser\":\"";
+            params<<toUser;
+            params<<"\",\"msgtype\":\"voice\"}";
+            char voiceId[33] = {0};
+            txca_request_cmd(voiceId, "SEND_MSG", "wechat_msg", params.str().c_str(), on_request_cmd_send_msg);
+        }
+
         return;
     }
 
@@ -215,6 +245,37 @@ void CXWeiTransferMgr::SendMsg(unsigned long long tinyId, const std::string &str
 
     free(msg.to_targetids);
     msg.to_targetids = NULL;
+}
+
+// 处理消息发送
+void CXWeiTransferMgr::ProcessWechatAudioMsgSend(std::string toUser)
+{
+    time_t t = time(NULL);
+    std::string strPath = "./";
+    char szFileName[100] = {0};
+    snprintf(szFileName, 100, "wechat_send_%ld.amr", (long)t);
+    std::string strFile = strPath;
+    if (strFile.at(strFile.length() - 1) != '/')
+    {
+        strFile.append("/");
+    }
+    strFile.append(szFileName);
+
+    std::string strVoiceData = GetVoiceData();
+    if (EncodeVoiceDataToAmr(strVoiceData, strFile))
+    {
+        unsigned long long cookie = 0;
+        UploadFile(strFile, &cookie);
+        m_mapSendWechatMsg[cookie] = toUser;
+    }
+
+    ResetVoiceData();
+    m_timeDuration = 0;
+}
+
+void CXWeiTransferMgr::UploadFile(const std::string &strFile, unsigned long long *cookie)
+{
+    txca_upload_file(transfer_channeltype_MINI, transfer_filetype_other, strFile.c_str(), cookie);
 }
 
 void CXWeiTransferMgr::AddVoiceData(const char *data, int length)

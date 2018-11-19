@@ -39,14 +39,14 @@ CXX_EXTERN_BEGIN
 #define DEF_TXCA_SKILL_ID_ALARM "8dab4796-fa37-4114-0012-7637fa2b0001"    //skill name: 提醒类
 #define DEF_TXCA_SKILL_ID_QQTEL "8dab4796-fa37-4114-0001-7637fa2b0001"    //skill name: 通讯-QQ通话
 #define DEF_TXCA_SKILL_ID_QQMSG "8dab4796-fa37-4114-0002-7637fa2b0001"    //skill name: 通讯-QQ消息
-#define DEF_TXCA_SKILL_ID_MSGBOX "8dab4796-fa37-4114-0012-7637fa2b0002"   //skill name: 消息盒子
+#define DEF_TXCA_SKILL_ID_WECHAT_MSG "8dab4796-fa37-4114-0002-7637fa2b0002"    //skill name: 通讯-微信消息
 #define DEF_TXCA_SKILL_ID_NAVIGATE "8dab4796-fa37-4114-0015-7637fa2b0001" //skill name: 导航
 #define DEF_TXCA_SKILL_ID_VOD "8dab4796-fa37-4114-0026-7637fa2b0001"      //skill name: 视频
 #define DEF_TXCA_SKILL_ID_TRIGGER_ALARM "8dab4796-fa37-4114-0036-7637fa2b0001"      //skill name: 闹钟触发场景
 
+
 #define DEF_TXCA_SKILL_ID_GLOBAL "8dab4796-fa37-4114-0000-7637fa2b0000"   //skill name: 通用控制
 
-#define DEF_TXCA_SKILL_NAME_CHAT_EX "小微闲聊"
 
 // 播放控制
 #define PROPERTY_ID_PLAY 700003            // 播放
@@ -92,7 +92,7 @@ CXX_EXTERN_BEGIN
 #define PROPERTY_ID_NEXT_PAGE 700149 // 下一页
 
 // 下面是视频使用
-#define PROPERTY_ID_SPEED_TO 700152  // 进度调节，快进到，快退到
+#define PROPERTY_ID_SPEED_TO 700152  // 进度调节，快进到
 #define PROPERTY_ID_EXIT 700153      // 退出
 #define PROPERTY_ID_REWIND_TO 700155 // 快退到
 
@@ -109,17 +109,15 @@ CXX_EXTERN_BEGIN
 
 // 下面是消息盒子的
 #define PROPERTY_ID_START 700125
-#define PROPERTY_ID_START_BY_ID 700127
-#define PROPERTY_ID_MSG_READED 700128
-#define PROPERTY_ID_IMAGENT 11054
 #define PROPERTY_ID_SEND_IOT_AUDIO_MSG  11018   //发送物联语音消息给手Q
 
 #define PROPERTY_ID_IOT_TEXT    10000   //物联文本消息
-#define PROPERTY_ID_IOT_VIDEO   10001   //群聊视频消息（小文件通道）
-#define PROPERTY_ID_IOT_IMAGE   10002   //群聊图片消息（小文件通道）
 #define PROPERTY_ID_IOT_AUDIO   10003   //群聊音频消息（小文件通道）
-#define PROPERTY_ID_IOT_OTHER   11001   //通过小文件通道接收的任意类型的文件
-#define PROPERTY_ID_IOT_CACHE   72010   //本地指令控制添加下载完的消息到消息盒子
+
+#define PROPERTY_ID_BLE_ENTER   11067   // 进入蓝牙模式
+#define PROPERTY_ID_BLE_EXIT   11068   // 退出蓝牙模式
+
+
 
 //etc...
 

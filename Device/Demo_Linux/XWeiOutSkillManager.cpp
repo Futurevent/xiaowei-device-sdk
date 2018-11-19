@@ -150,7 +150,7 @@ void XWeiOutSkillManager::abandonAudioFocus(OutSkillAudioFocusListener *listener
 }
 
 // 收到消息的音效和消息发送成功的音效都是这个铃声
-const std::string QQMsgSkillHandler::MSG_RING = "http://qzonestyle.gtimg.cn/qzone/vas/opensns/res/doc/msg.ring.mp3";
+const std::string MsgSkillHandler::MSG_RING = "http://qzonestyle.gtimg.cn/qzone/vas/opensns/res/doc/msg.ring.mp3";
 
 TipPlayer::TipPlayer()
 {
@@ -178,11 +178,11 @@ void TipPlayer::onAudioFocucChange(int focusChange)
     }
 }
 
-QQMsgMedia::QQMsgMedia()
+MsgMedia::MsgMedia()
 {
 }
 
-QQMsgMedia::QQMsgMedia(std::string content, MEDIA_TYPE type, bool isMsg, std::string id)
+MsgMedia::MsgMedia(std::string content, MEDIA_TYPE type, bool isMsg, std::string id)
 {
     this->content = content;
     this->type = type;
@@ -190,11 +190,11 @@ QQMsgMedia::QQMsgMedia(std::string content, MEDIA_TYPE type, bool isMsg, std::st
     this->id = id;
 }
 
-QQMsgMedia::~QQMsgMedia()
+MsgMedia::~MsgMedia()
 {
 }
 
-QQMsgSkillHandler::QQMsgSkillHandler() : m_sessionId(-1),
+MsgSkillHandler::MsgSkillHandler() : m_sessionId(-1),
                                          m_curState(SKILL_STATE_IDLE),
                                          m_targetId(0)
 {
@@ -202,7 +202,7 @@ QQMsgSkillHandler::QQMsgSkillHandler() : m_sessionId(-1),
     pthread_mutex_init(&m_msgPlayListMutex, NULL);
 }
 
-QQMsgSkillHandler::~QQMsgSkillHandler()
+MsgSkillHandler::~MsgSkillHandler()
 {
     if (m_tipPlayer)
     {
@@ -212,11 +212,11 @@ QQMsgSkillHandler::~QQMsgSkillHandler()
     pthread_mutex_destroy(&m_msgPlayListMutex);
 }
 
-void QQMsgSkillHandler::onDownloadFileResult(int err_code, const txc_msg_info *msg_info)
+void MsgSkillHandler::onDownloadFileResult(int err_code, const txc_msg_info *msg_info)
 {
     if (err_code != err_null || msg_info == NULL)
     {
-        printf("QQMsgSkillHandler::onDownloadFileResult err_code[%d] or msg_info is NULL", err_code);
+        printf("MsgSkillHandler::onDownloadFileResult err_code[%d] or msg_info is NULL", err_code);
         return;
     }
 
@@ -245,20 +245,20 @@ void QQMsgSkillHandler::onDownloadFileResult(int err_code, const txc_msg_info *m
     }
 }
 
-void QQMsgSkillHandler::onSendMsgResult(int err_code)
+void MsgSkillHandler::onSendMsgResult(int err_code)
 {
     if (err_code != err_null)
     {
-        printf("QQMsgSkillHandler::onSendMsgResult err_code[%d]", err_code);
+        printf("MsgSkillHandler::onSendMsgResult err_code[%d]", err_code);
         return;
     }
 
     playTipRes(MSG_RING);
 }
 
-bool QQMsgSkillHandler::OnRequest(TXCA_EVENT event)
+bool MsgSkillHandler::OnRequest(TXCA_EVENT event, TXCA_PARAM_RESPONSE *cRsp)
 {
-    printf("QQMsgSkillHandler::OnRequest event[%d]", event);
+    printf("MsgSkillHandler::OnRequest event[%d]", event);
     if (event == txca_event_on_request_start)
     {
         g_xwei_transfer_mgr.ProcessAudioMsgRecord(true);
@@ -269,19 +269,28 @@ bool QQMsgSkillHandler::OnRequest(TXCA_EVENT event)
     }
     else if (event == txca_event_on_response)
     {
-        g_xwei_transfer_mgr.ProcessAudioMsgSend(m_targetId, this);
+        if (DEF_TXCA_SKILL_ID_QQMSG == cRsp->skill_info.id) {
+            g_xwei_transfer_mgr.ProcessAudioMsgSend(m_targetId, this);
+        } else if (DEF_TXCA_SKILL_ID_WECHAT_MSG == cRsp->skill_info.id) {
+            const TXCA_PARAM_RESOURCE *resource = cRsp->resource_groups[0].resources;
+            if (resource && resource->format == txca_resource_command && resource->content && resource->content[0])
+            {
+                std::string toUser = resource->content;
+                g_xwei_transfer_mgr.ProcessWechatAudioMsgSend(toUser);
+            }
+        }
     }
 
     return true;
 }
 
-void QQMsgSkillHandler::OnFeedAudioData(const char *data, int length)
+void MsgSkillHandler::OnFeedAudioData(const char *data, int length)
 {
-    printf("QQMsgSkillHandler::OnFeedAudioData length[%d]", length);
+    printf("MsgSkillHandler::OnFeedAudioData length[%d]", length);
     g_xwei_transfer_mgr.AddVoiceData(data, length);
 }
 
-bool QQMsgSkillHandler::handleResponse(int sessionId, TXCA_PARAM_RESPONSE *cRsp)
+bool MsgSkillHandler::handleResponse(int sessionId, TXCA_PARAM_RESPONSE *cRsp)
 {
     if (m_sessionId == -1)
     {
@@ -311,7 +320,7 @@ bool QQMsgSkillHandler::handleResponse(int sessionId, TXCA_PARAM_RESPONSE *cRsp)
     return handled;
 }
 
-bool QQMsgSkillHandler::onMessage(int session_id, XWM_EVENT event, XWPARAM arg1, XWPARAM arg2)
+bool MsgSkillHandler::onMessage(int session_id, XWM_EVENT event, XWPARAM arg1, XWPARAM arg2)
 {
     // 判断session_id是不是给当前App处理的
     if (m_sessionId != session_id)
@@ -322,7 +331,7 @@ bool QQMsgSkillHandler::onMessage(int session_id, XWM_EVENT event, XWPARAM arg1,
     if (event == XWM_PLAYER_STATUS_CHANGED)
     {
         TXC_PLAYER_STATE state = TXC_PLAYER_STATE(reinterpret_cast<long>(arg1));
-        printf("QQMsgSkillHandler::onMessage playstate[%d]", state);
+        printf("MsgSkillHandler::onMessage playstate[%d]", state);
         if (state == TXC_PLAYER_STATE_COMPLETE)
         {
             playNextMedia();
@@ -330,7 +339,7 @@ bool QQMsgSkillHandler::onMessage(int session_id, XWM_EVENT event, XWPARAM arg1,
             {
                 // 需要更新消息为已读
                 int msgId = atoi(m_curMedia.id.c_str());
-                printf("QQMsgSkillHandler::onMessage msgId[%d]", msgId);
+                printf("MsgSkillHandler::onMessage msgId[%d]", msgId);
                 XWeiCMsgbox::instance().SetMsgReaded((unsigned int)msgId);
             }
         }
@@ -343,9 +352,9 @@ bool QQMsgSkillHandler::onMessage(int session_id, XWM_EVENT event, XWPARAM arg1,
     return true;
 }
 
-void QQMsgSkillHandler::onAudioFocucChange(int focusChange)
+void MsgSkillHandler::onAudioFocucChange(int focusChange)
 {
-    printf("QQMsgSkillHandler::onAudioFocucChange [%d]", focusChange);
+    printf("MsgSkillHandler::onAudioFocucChange [%d]", focusChange);
     if (focusChange == AUDIOFOCUS_GAIN)
     {
         playNextMedia();
@@ -356,7 +365,7 @@ void QQMsgSkillHandler::onAudioFocucChange(int focusChange)
     }
 }
 
-bool QQMsgSkillHandler::processRecvMsg(TXCA_PARAM_RESPONSE *cRsp)
+bool MsgSkillHandler::processRecvMsg(TXCA_PARAM_RESPONSE *cRsp)
 {
     bool handled = false;
     if (cRsp->resource_groups_size >= 1 && cRsp->resource_groups[0].resources_size >= 1)
@@ -364,14 +373,18 @@ bool QQMsgSkillHandler::processRecvMsg(TXCA_PARAM_RESPONSE *cRsp)
         const TXCA_PARAM_RESOURCE *resource = cRsp->resource_groups[0].resources;
         if (resource->format == txca_resource_command && resource->id && resource->id[0])
         {
-            int cmdId = std::atoi(resource->id);
-            if (cmdId == PROPERTY_ID_IOT_TEXT)
-            { // 文本消息
-                handled = processTextMsg(resource->content, resource->extend_buffer);
-            }
-            else if (cmdId == PROPERTY_ID_IOT_AUDIO)
-            { //语音消息
-                handled = processAudioMsg(resource->content, resource->extend_buffer);
+            if (DEF_TXCA_SKILL_ID_QQMSG == cRsp->skill_info.id) {
+                int cmdId = std::atoi(resource->id);
+                if (cmdId == PROPERTY_ID_IOT_TEXT)
+                { // 文本消息
+                    handled = processTextMsg(resource->content, resource->extend_buffer);
+                }
+                else if (cmdId == PROPERTY_ID_IOT_AUDIO)
+                { //语音消息
+                    handled = processAudioMsg(resource->content, resource->extend_buffer);
+                }
+            } else if (DEF_TXCA_SKILL_ID_WECHAT_MSG == cRsp->skill_info.id) {
+                handled = processWechatMsg(resource->content, resource->extend_buffer);
             }
         }
     }
@@ -379,7 +392,7 @@ bool QQMsgSkillHandler::processRecvMsg(TXCA_PARAM_RESPONSE *cRsp)
     return handled;
 }
 
-bool QQMsgSkillHandler::processTextMsg(const char *content, const char *extendBuf)
+bool MsgSkillHandler::processTextMsg(const char *content, const char *extendBuf)
 {
     if (content == NULL || extendBuf == NULL)
     {
@@ -444,7 +457,7 @@ bool QQMsgSkillHandler::processTextMsg(const char *content, const char *extendBu
     return true;
 }
 
-bool QQMsgSkillHandler::processAudioMsg(const char *content, const char *extendBuf)
+bool MsgSkillHandler::processAudioMsg(const char *content, const char *extendBuf)
 {
     if (content == NULL || extendBuf == NULL)
     {
@@ -524,7 +537,104 @@ bool QQMsgSkillHandler::processAudioMsg(const char *content, const char *extendB
     return true;
 }
 
-bool QQMsgSkillHandler::processSendMsg(TXCA_PARAM_RESPONSE *cRsp)
+bool MsgSkillHandler::processWechatMsg(const char *content, const char *extendBuf)
+{
+    // 解析发送者的id信息
+    std::string from;
+    rapidjson::Document json_from;
+    json_from.Parse(content);
+    if (!json_from.HasParseError())
+    {
+        assert(json_from.IsObject());
+        if (json_from.HasMember("from"))
+        {
+            from = json_from["from"].GetString();
+        }
+    }
+
+    // 解析消息内容
+    int timestamp = (int)time(NULL);
+
+    std::string strText;
+    rapidjson::Document json_content;
+    json_content.Parse(content);
+    if (!json_content.HasParseError())
+    {
+        assert(json_content.IsObject());
+        if (json_content.HasMember("content"))
+        {
+            strText = json_content["content"].GetString();
+        }
+    }
+
+    std::string remark;
+    rapidjson::Document json_remark;
+    json_remark.Parse(content);
+    if (!json_remark.HasParseError())
+    {
+        assert(json_remark.IsObject());
+        if (json_remark.HasMember("remark"))
+        {
+            remark = json_remark["remark"].GetString();
+        }
+    }
+
+    std::string headurl;
+    rapidjson::Document json_headurl;
+    json_headurl.Parse(content);
+    if (!json_headurl.HasParseError())
+    {
+        assert(json_headurl.IsObject());
+        if (json_headurl.HasMember("headurl"))
+        {
+            headurl = json_headurl["headurl"].GetString();
+        }
+    }
+
+    std::string msgtype;
+    rapidjson::Document json_msgtype;
+    json_msgtype.Parse(content);
+    if (!json_msgtype.HasParseError())
+    {
+        assert(json_msgtype.IsObject());
+        if (json_msgtype.HasMember("msgtype"))
+        {
+            msgtype = json_msgtype["msgtype"].GetString();
+        }
+    }
+
+    CXWeiMsgWechat *pWechatText = new CXWeiMsgWechat;
+    pWechatText->from = from;
+    pWechatText->timestamp = timestamp;
+    pWechatText->content = strText;
+    pWechatText->remark = remark;
+    pWechatText->headurl = headurl;
+    if(WECHAT_MSG_TYPE_VOICE == msgtype) {
+        pWechatText->msgType = wechat_msg_type_audio_url;// todo： url 消息会7天过期，所以应该下载下来存在本地变成wechat_msg_type_audio_file类型
+    } else if(WECHAT_MSG_TYPE_TEXT == msgtype) {
+        pWechatText->msgType = wechat_msg_type_text;
+    }
+    XWeiCMsgbox::instance().AddMsg(pWechatText);
+
+    if (CXWeiApp::instance().AudioEngine().IsDeviceActive())
+    {
+        genMediaWithMsg(pWechatText);
+        if (m_curState == SKILL_STATE_IDLE)
+        {
+
+            m_curState = SKILL_STATE_ONCE_PLAY;
+
+            XWeiOutSkillManager::instance()->requestAudioFocus(this, AUDIOFOCUS_GAIN);
+        }
+    }
+    else
+    {
+        playTipRes(MSG_RING);
+    }
+    return true;
+}
+
+bool MsgSkillHandler::processSendMsg(TXCA_PARAM_RESPONSE *cRsp)
 {
     bool handled = false;
     if (cRsp->resource_groups_size >= 1 && cRsp->resource_groups[0].resources_size >= 1)
@@ -556,7 +666,7 @@ bool QQMsgSkillHandler::processSendMsg(TXCA_PARAM_RESPONSE *cRsp)
                 const TXCA_PARAM_RESOURCE *resource = cRsp->resource_groups[i].resources + j;
                 if (resource->format == txca_resource_tts || resource->format == txca_resource_url)
                 {
-                    QQMsgMedia media;
+                    MsgMedia media;
                     media.type = resource->format == txca_resource_tts ? TYPE_TTS_OPUS : TYPE_MUSIC_URL;
                     media.id = resource->id;
                     media.content = resource->content;
@@ -574,7 +684,7 @@ bool QQMsgSkillHandler::processSendMsg(TXCA_PARAM_RESPONSE *cRsp)
     return handled;
 }
 
-bool QQMsgSkillHandler::processPlayMsg(TXCA_PARAM_RESPONSE *cRsp)
+bool MsgSkillHandler::processPlayMsg(TXCA_PARAM_RESPONSE *cRsp)
 {
     bool handled = false;
     if (cRsp->resource_groups_size >= 1 && cRsp->resource_groups[0].resources_size >= 1)
@@ -595,14 +705,14 @@ bool QQMsgSkillHandler::processPlayMsg(TXCA_PARAM_RESPONSE *cRsp)
     return handled;
 }
 
-bool QQMsgSkillHandler::processException(TXCA_PARAM_RESPONSE *cRsp)
+bool MsgSkillHandler::processException(TXCA_PARAM_RESPONSE *cRsp)
 {
     if (cRsp->resource_groups_size >= 1 && cRsp->resource_groups[0].resources_size >= 1)
     {
         const TXCA_PARAM_RESOURCE *resource = cRsp->resource_groups[0].resources;
         if (resource->format == txca_resource_tts && resource->id && resource->id[0])
         {
-            QQMsgMedia media;
+            MsgMedia media;
             media.type = TYPE_TTS_OPUS;
             media.id = resource->id;
             media.content = resource->content;
@@ -618,7 +728,7 @@ bool QQMsgSkillHandler::processException(TXCA_PARAM_RESPONSE *cRsp)
     return false;
 }
 
-void QQMsgSkillHandler::playTipRes(std::string url)
+void MsgSkillHandler::playTipRes(std::string url)
 {
     if (m_tipPlayer)
     {
@@ -626,20 +736,46 @@ void QQMsgSkillHandler::playTipRes(std::string url)
     }
 }
 
-void QQMsgSkillHandler::clearMsgPlayList()
+void MsgSkillHandler::clearMsgPlayList()
 {
     pthread_mutex_lock(&m_msgPlayListMutex);
-    std::queue<QQMsgMedia> empty;
+    std::queue<MsgMedia> empty;
     std::swap(m_msgPlayList, empty);
     pthread_mutex_unlock(&m_msgPlayListMutex);
 }
 
-void QQMsgSkillHandler::genMediaWithMsg(XWeiCMsgBase *msg)
+void on_request_cmd(const char* voice_id, int err_code, const char * json) {
+
+}
+
+void MsgSkillHandler::genMediaWithMsg(XWeiCMsgBase *msg)
 {
     char voiceId[33] = {0};
-    txca_request_protocol_tts(voiceId, msg->uin_, msg->timestamp, txca_protocol_cmd_msg);
 
-    QQMsgMedia tipMedia;
+    if (msg->msgType <= qq_msg_type_iot_text) {
+        std::stringstream params;
+        params<<"{\"tiny_id\":";
+        params<<msg->uin_;
+        params<<",\"timestamp\":";
+        params<<msg->timestamp;
+        params<<"}";
+
+        txca_request_cmd(voiceId, "TTS_TIPS", "qq_msg", params.str().c_str() , on_request_cmd);
+    } else {
+
+        CXWeiMsgWechat *tmp = dynamic_cast<CXWeiMsgWechat *>(msg);
+        if(tmp) {
+            std::stringstream params;
+            params<<"{\"open_id\":\"";
+            params<<tmp->from;
+            params<<"\",\"timestamp\":";
+            params<<msg->timestamp;
+            params<<"}";
+            txca_request_cmd(voiceId, "TTS_TIPS", "wechat_msg",  params.str().c_str(), on_request_cmd);
+        }
+    }
+
+    MsgMedia tipMedia;
     tipMedia.id = voiceId;
     tipMedia.isMsg = false;
     tipMedia.type = TYPE_TTS_OPUS;
@@ -647,20 +783,38 @@ void QQMsgSkillHandler::genMediaWithMsg(XWeiCMsgBase *msg)
     std::stringstream msgIdStr;
     msgIdStr << msg->msgId;
 
-    QQMsgMedia msgMedia;
+    MsgMedia msgMedia;
     msgMedia.isMsg = true;
     msgMedia.id = msgIdStr.str();
     if (msg->msgType == qq_msg_type_iot_audio)
     {
         CXWeiMsgAudio *tmp = dynamic_cast<CXWeiMsgAudio *>(msg);
         msgMedia.type = TYPE_MUSIC_URL;
-        msgMedia.content = tmp->localUrl;
+        msgMedia.content = tmp->localUrl;// local file path
     }
     else if (msg->msgType == qq_msg_type_iot_text)
     {
         CXWeiMsgText *tmp = dynamic_cast<CXWeiMsgText *>(msg);
         msgMedia.type = TYPE_TTS_TEXT;
         msgMedia.content = tmp->text;
+    }
+    else if (msg->msgType == wechat_msg_type_text)
+    {
+        CXWeiMsgWechat *tmp = dynamic_cast<CXWeiMsgWechat *>(msg);
+        msgMedia.type = TYPE_TTS_TEXT;
+        msgMedia.content = tmp->content;
+    }
+    else if (msg->msgType == wechat_msg_type_audio_url)
+    {
+        CXWeiMsgWechat *tmp = dynamic_cast<CXWeiMsgWechat *>(msg);
+        msgMedia.type = TYPE_MUSIC_URL;
+        msgMedia.content = tmp->content;// url
+    }
+    else if (msg->msgType == wechat_msg_type_audio_file)
+    {
+        CXWeiMsgWechat *tmp = dynamic_cast<CXWeiMsgWechat *>(msg);
+        msgMedia.type = TYPE_MUSIC_URL;
+        msgMedia.content = tmp->content;// local file path
     }
 
     pthread_mutex_lock(&m_msgPlayListMutex);
@@ -669,7 +823,7 @@ void QQMsgSkillHandler::genMediaWithMsg(XWeiCMsgBase *msg)
     pthread_mutex_unlock(&m_msgPlayListMutex);
 }
 
-void QQMsgSkillHandler::playNextMedia()
+void MsgSkillHandler::playNextMedia()
 {
     bool isNeedContinue = false;
     if (m_msgPlayList.empty())
@@ -686,10 +840,10 @@ void QQMsgSkillHandler::playNextMedia()
             {
                 // end tip for user
                 m_curState = SKILL_STATE_IDLE;
-                QQMsgMedia tipMedia;
+                MsgMedia tipMedia;
                 tipMedia.id = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
                 tipMedia.isMsg = false;
-                tipMedia.content = "没有更多消息了";
+                tipMedia.content = "没有更多未读消息了";
                 tipMedia.type = TYPE_TTS_TEXT;
                 pthread_mutex_lock(&m_msgPlayListMutex);
                 m_msgPlayList.push(tipMedia);

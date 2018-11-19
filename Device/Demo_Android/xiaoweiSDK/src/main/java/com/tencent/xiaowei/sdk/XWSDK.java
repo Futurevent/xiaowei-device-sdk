@@ -102,13 +102,6 @@ public class XWSDK {
     }
 
     /**
-     * 反初始化语音服务
-     */
-    public int unInit() {
-        return XWSDKJNI.stopXiaoweiService();
-    }
-
-    /**
      * 登录小微服务，所有的服务都应该在登录后进行
      *
      * @param context   上下文对象
@@ -118,6 +111,9 @@ public class XWSDK {
     public void login(Context context, XWLoginInfo loginInfo, OnXWLoginListener listener) {
         mContext = context.getApplicationContext();
 
+        if (mContext == null) {
+            throw new RuntimeException("context cannot be null.");
+        }
         if (listener == null) {
             throw new RuntimeException("Init XWSDK failed,listener is null.");
         }
@@ -188,6 +184,25 @@ public class XWSDK {
     }
 
     /**
+     * 退出登录，释放资源
+     *
+     * @param listener
+     * @return
+     */
+    public int logout(OnXWLogoutListener listener) {
+        mMapRequestListener.clear();
+        mDeviceGetAlarmListListener.clear();
+        mDeviceSetAlarmListener.clear();
+        mRspListenerMap.clear();
+        mXWLoginInfo = null;
+        mContext = null;
+        mainHandler = null;
+        mUiThread = null;
+        XWDeviceBaseManager.setOnXWLogoutListener(listener);
+        return XWSDKJNI.getInstance().destroy();
+    }
+
+    /**
      * 监听设备在线状态
      *
      * @param listener
@@ -202,6 +217,10 @@ public class XWSDK {
      * @param accountInfo
      */
     public void setXWAccountInfo(XWAccountInfo accountInfo) {
+
+        if (mContext == null) {
+            throw new RuntimeException("You need to call login at first.");
+        }
         XWSDKJNI.setXWAccountInfo(accountInfo);
     }
 
@@ -249,6 +268,13 @@ public class XWSDK {
         void onBinderListChange(int errorCode, ArrayList<XWBinderInfo> arrayList);
     }
 
+    /**
+     * 小微登出相关事件
+     */
+    public interface OnXWLogoutListener {
+        void onLogout();
+    }
+
     public interface OnXWOnlineStatusListener {
         /**
          * 上线，在登录成功和平时网络恢复会被调用。在线才能发出去请求
@@ -273,6 +299,9 @@ public class XWSDK {
     }
 
     public String request(int type, byte[] requestData, XWRequestInfo param) {
+        if (mContext == null) {
+            throw new RuntimeException("You need to call login at first.");
+        }
         String strVoiceID = XWSDKJNI.request(type, requestData, param);
         if (strVoiceID.isEmpty()) {
             QLog.e(TAG, "request voiceID is null.");
@@ -302,6 +331,9 @@ public class XWSDK {
      * @param voiceId 要取消的voiceID，当为null的时候，表示取消所有请求
      */
     public int requestCancel(String voiceId) {
+        if (mContext == null) {
+            throw new RuntimeException("You need to call login at first.");
+        }
         return XWSDKJNI.cancelRequest(voiceId);
     }
 
@@ -313,6 +345,9 @@ public class XWSDK {
      * @return 本次请求对应的VoiceID
      */
     public String requestTTS(@NonNull byte[] strText, RequestListener listener) {
+        if (mContext == null) {
+            throw new RuntimeException("You need to call login at first.");
+        }
         String strVoiceID = XWSDKJNI.request(XWCommonDef.RequestType.ONLY_TTS, strText, null);
 
         if (strVoiceID.isEmpty()) {
@@ -337,6 +372,9 @@ public class XWSDK {
      */
     @Deprecated
     public String requestTTS(@NonNull byte[] strText, XWContextInfo contextInfo, RequestListener listener) {
+        if (mContext == null) {
+            throw new RuntimeException("You need to call login at first.");
+        }
         return requestTTS(strText, listener);
     }
 
@@ -346,6 +384,9 @@ public class XWSDK {
      * @param resId
      */
     public void cancelTTS(String resId) {
+        if (mContext == null) {
+            throw new RuntimeException("You need to call login at first.");
+        }
         XWSDKJNI.cancelTTS(resId);
     }
 
@@ -361,6 +402,9 @@ public class XWSDK {
      * @return 本次请求对应的voiceID
      */
     public String getMorePlaylist(XWAppInfo appInfo, String playID, int maxListSize, boolean isUp, RequestListener listener) {
+        if (mContext == null) {
+            throw new RuntimeException("You need to call login at first.");
+        }
         if (null == listener) {
             return "";
         }
@@ -385,6 +429,9 @@ public class XWSDK {
      * @return 本次请求对应的voiceID
      */
     public String getPlayDetailInfo(XWAppInfo appInfo, String[] listPlayID, RequestListener listener) {
+        if (mContext == null) {
+            throw new RuntimeException("You need to call login at first.");
+        }
         if (null == listener) {
             return "";
         }
@@ -407,6 +454,9 @@ public class XWSDK {
      * @return 本次请求对应的voiceID
      */
     public String refreshPlayList(XWAppInfo appInfo, String[] listPlayID, RequestListener listener) {
+        if (mContext == null) {
+            throw new RuntimeException("You need to call login at first.");
+        }
         String strVoiceID = XWSDKJNI.refreshPlayList(appInfo, listPlayID);
         if (strVoiceID.isEmpty()) {
             return strVoiceID;
@@ -426,6 +476,9 @@ public class XWSDK {
      * @return 返回值请参考 {@link XWCommonDef.ErrorCode}
      */
     public int setMusicQuality(int quality) {
+        if (mContext == null) {
+            throw new RuntimeException("You need to call login at first.");
+        }
         return XWSDKJNI.setQuality(quality);
     }
 
@@ -458,6 +511,8 @@ public class XWSDK {
         return false;
     }
 
+    long lastNetDelayTime;
+
     boolean onNetWorkDelay(final String voiceID, final long time) {
         if (mNetworkDelayListener != null) {
             runOnMainThread(new Runnable() {
@@ -467,6 +522,7 @@ public class XWSDK {
                 }
             });
         }
+        lastNetDelayTime = time;
         return true;
     }
 
@@ -476,6 +532,9 @@ public class XWSDK {
      * @param log
      */
     public void reportEvent(XWEventLogInfo log) {
+        if (mContext == null) {
+            throw new RuntimeException("You need to call login at first.");
+        }
         XWSDKJNI.reportEvent(log);
     }
 
@@ -485,6 +544,9 @@ public class XWSDK {
      * @param stateInfo 要上报的当前状态
      */
     public int reportPlayState(XWPlayStateInfo stateInfo) {
+        if (mContext == null) {
+            throw new RuntimeException("You need to call login at first.");
+        }
         QLog.d(TAG, "reportPlayState " + stateInfo);
         return XWSDKJNI.reportPlayState(stateInfo);
     }
@@ -591,7 +653,7 @@ public class XWSDK {
      */
     public int getDeviceAlarmList(GetAlarmListRspListener listener) {
         if (mContext == null) {
-            throw new RuntimeException("You need to call init at first.");
+            throw new RuntimeException("You need to call login at first.");
         }
 
         String voiceId = XWSDKJNI.getDeviceAlarmList();
@@ -635,7 +697,7 @@ public class XWSDK {
      */
     public int setDeviceAlarmInfo(int opType, String strAlarmJson, SetAlarmRspListener listener) {
         if (mContext == null) {
-            throw new RuntimeException("You need to call init at first.");
+            throw new RuntimeException("You need to call login at first.");
         }
 
         String voiceId = XWSDKJNI.setDeviceAlarm(opType, strAlarmJson);
@@ -658,7 +720,7 @@ public class XWSDK {
      */
     public int getTimingSkillResource(String strAlarmId, RequestListener listener) {
         if (mContext == null) {
-            throw new RuntimeException("You need to call init at first.");
+            throw new RuntimeException("You need to call login at first.");
         }
 
         String voiceId = XWSDKJNI.getTimingSkillResource(strAlarmId);
@@ -674,6 +736,9 @@ public class XWSDK {
      * 上报日志文件
      */
     public void uploadLogs(String start, String end) {
+        if (mContext == null) {
+            throw new RuntimeException("You need to call login at first.");
+        }
         XWSDKJNI.getInstance().uploadLogs(start, end);
     }
 
@@ -681,6 +746,9 @@ public class XWSDK {
      * 用户不满意上次的识别，将上一次的记录上报到后台
      */
     public void errorFeedBack() {
+        if (mContext == null) {
+            throw new RuntimeException("You need to call login at first.");
+        }
         XWSDKJNI.errorFeedBack();
     }
 
@@ -691,6 +759,9 @@ public class XWSDK {
      * @param listener
      */
     public void setLoginStatus(XWLoginStatusInfo info, RequestListener listener) {
+        if (mContext == null) {
+            throw new RuntimeException("You need to call login at first.");
+        }
         if (null == listener) {
             return;
         }
@@ -709,6 +780,9 @@ public class XWSDK {
      * @param listener
      */
     public void getLoginStatus(String skillId, RequestListener listener) {
+        if (mContext == null) {
+            throw new RuntimeException("You need to call login at first.");
+        }
         if (null == listener) {
             return;
         }
@@ -727,6 +801,9 @@ public class XWSDK {
      */
     @Deprecated
     public void getMusicVipInfo(RequestListener listener) {
+        if (mContext == null) {
+            throw new RuntimeException("You need to call login at first.");
+        }
         if (null == listener) {
             return;
         }
@@ -759,6 +836,9 @@ public class XWSDK {
      * @return 0:success else failed
      */
     public int enableV2A(boolean enable) {
+        if (mContext == null) {
+            throw new RuntimeException("You need to call login at first.");
+        }
         return XWSDKJNI.enableV2A(enable);
     }
 
@@ -778,6 +858,9 @@ public class XWSDK {
      * @return 0:success else failed
      */
     public int setWordslist(int type, String[] words_list, OnSetWordsListListener listener) {
+        if (mContext == null) {
+            throw new RuntimeException("You need to call login at first.");
+        }
         mSetWordsListListener = listener;
         return XWSDKJNI.setWordslist(type, words_list);
     }
@@ -808,6 +891,9 @@ public class XWSDK {
      * @param isFavorite true表示收藏，false表示取消收藏
      */
     public void setFavorite(XWAppInfo appInfo, String playId, boolean isFavorite) {
+        if (mContext == null) {
+            throw new RuntimeException("You need to call login at first.");
+        }
         XWSDKJNI.setFavorite(appInfo, playId, isFavorite);
     }
 
@@ -824,6 +910,9 @@ public class XWSDK {
      * @return TTS的resId
      */
     public String requestProtocolTTS(long tinyid, long timestamp, int type, RequestListener listener) {
+        if (mContext == null) {
+            throw new RuntimeException("You need to call login at first.");
+        }
         String strVoiceID = XWSDKJNI.requestProtocolTTS(tinyid, timestamp, type);
         if (!strVoiceID.isEmpty() && listener != null) {
             QLog.e(TAG, "requestProtocolTTS voiceId: " + strVoiceID);
@@ -838,6 +927,9 @@ public class XWSDK {
      * @param stateInfo 自定义状态
      */
     public int setUserState(XWPlayStateInfo stateInfo) {
+        if (mContext == null) {
+            throw new RuntimeException("You need to call login at first.");
+        }
         return XWSDKJNI.setUserState(stateInfo);
     }
 
@@ -845,6 +937,9 @@ public class XWSDK {
      * 清除自定义设备状态, 与setUserState配合使用
      */
     public int clearUserState() {
+        if (mContext == null) {
+            throw new RuntimeException("You need to call login at first.");
+        }
         return XWSDKJNI.clearUserState();
     }
 
@@ -869,6 +964,9 @@ public class XWSDK {
      * @param listener {@link OnRspListener}
      */
     public String request(String cmd, String subCmd, String params, OnRspListener listener) {
+        if (mContext == null) {
+            throw new RuntimeException("You need to call login at first.");
+        }
         String strVoiceID = XWSDKJNI.requestCmd(cmd, subCmd, params);
         if (!strVoiceID.isEmpty() && listener != null) {
             QLog.d(TAG, "request voiceId: " + strVoiceID);
@@ -877,10 +975,15 @@ public class XWSDK {
         return strVoiceID;
     }
 
-    public void onRequest(String voiceId, int error, String json) {
-        OnRspListener listener = mRspListenerMap.get(voiceId);
+    public void onRequest(final String voiceId, final int error, final String json) {
+        final OnRspListener listener = mRspListenerMap.get(voiceId);
         if (listener != null) {
-            listener.onRsp(voiceId, error, json);
+            mainHandler.post(new Runnable() {
+                @Override
+                public void run() {
+                    listener.onRsp(voiceId, error, json);
+                }
+            });
         }
     }
 

@@ -120,6 +120,29 @@ void CXWeiMsgAudio::ToString(std::stringstream &ss) const
     ss << duration;
 }
 
+CXWeiMsgWechat::CXWeiMsgWechat()
+{
+    msgType = wechat_msg_type_text;
+}
+
+CXWeiMsgWechat::~CXWeiMsgWechat()
+{
+}
+
+void CXWeiMsgWechat::ToString(std::stringstream &ss) const
+{
+    XWeiCMsgBase::ToString(ss);
+
+    ss << ", from:";
+    ss << from;
+    ss << ", content:";
+    ss << content;
+    ss << ", remark:";
+    ss << remark;
+    ss << ", headurl:";
+    ss << headurl;
+}
+
 XWeiCMsgbox::XWeiCMsgbox()
     : m_nMaxMsgSize(50), m_nMsgIndex(-1), m_uin(0)
 {

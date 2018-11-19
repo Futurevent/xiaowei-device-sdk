@@ -65,11 +65,7 @@ public class XWSDKJNI {
     static {
         String[] so = {"stlport_shared", "xiaoweiSDK", "xiaowei"};
         for (String s : so) {
-            try {
-                System.loadLibrary(s);
-            } catch (UnsatisfiedLinkError e) {
-                e.printStackTrace();
-            }
+            System.loadLibrary(s);
         }
     }
 
@@ -116,6 +112,13 @@ public class XWSDKJNI {
      */
     public native int init(String deviceName, byte[] license, String serialNumber, String srvPubKey, long productID, int productVersion, int networkType, int runMode,
                            String sysPath, long sysCapacity, String appPath, long appCapacity, String tmpPath, long tmpCapacity, int testMode);
+
+    /**
+     * 调用反初始化后不可再调用其他接口，除非再次init
+     *
+     * @return
+     */
+    public native int unInit();
 
     /**
      * 获取SDK版本信息
@@ -523,6 +526,11 @@ public class XWSDKJNI {
         XWDeviceBaseManager.onOfflineSuccess();
     }
 
+    private void onLogout() {
+        XWDeviceBaseManager.onLogout();
+        XWSDK.online = false;
+    }
+
     private void onWlanUploadRegInfoSuccess(int error) {
         XWDeviceBaseManager.onUploadRegInfoSuccess(error);
     }
@@ -746,5 +754,12 @@ public class XWSDKJNI {
 
     private void OnRequest(String voiceId, int error, String json) {
         XWSDK.getInstance().onRequest(voiceId, error, json);
+    }
+
+    public int destroy() {
+        mBinderList.clear();
+        mLogMap.clear();
+        XWDeviceBaseManager.mAllFriendListCache.clear();
+        return unInit();
     }
 }

@@ -98,6 +98,7 @@ protected:
 
 private:
   bool m_isRecovery;
+  bool m_isAddedAlbum;
 };
 
 class AppKitMusic : public PlayerKit

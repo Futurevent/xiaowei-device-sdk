@@ -49,7 +49,6 @@ dependencies {
     compile project(':wakeup')
     compile 'com.android.support:support-v4:24.0.0'
     compile(name: 'zxing-android-embedded-3.3.0', ext: 'aar')
-    compile 'com.android.support:appcompat-v7:23.0.0'
     compile 'com.android.support:recyclerview-v7:23.0.0'
     compile 'com.squareup.picasso:picasso:2.5.2'
 }

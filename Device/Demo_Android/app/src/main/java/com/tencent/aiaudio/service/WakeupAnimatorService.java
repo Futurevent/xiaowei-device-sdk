@@ -146,7 +146,7 @@ public class WakeupAnimatorService extends Service {
 
                     if (text.length() > 0)
                         mTvText.setVisibility(View.VISIBLE);
-                    else{
+                    else {
                         mTvText.setVisibility(View.GONE);
                     }
                     break;
@@ -236,7 +236,7 @@ public class WakeupAnimatorService extends Service {
         tvNet.setBackgroundColor(getResources().getColor(R.color.white40));
         FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
         mFloatView.addView(tvNet, lp);
-        UIUtils.createFloatView(mFloatView, (int) (UIUtils.getScreenWidth(CommonApplication.mApplication) - UIUtils.dip2px(CommonApplication.mApplication, 100)), 0, UIUtils.dip2px(CommonApplication.mApplication, 50), UIUtils.dip2px(CommonApplication.mApplication, 20), 0, false);
+        UIUtils.createFloatView(mFloatView, (int) (UIUtils.getScreenWidth(CommonApplication.mApplication) - UIUtils.dip2px(CommonApplication.mApplication, 100)), 0, UIUtils.dip2px(CommonApplication.mApplication, 80), UIUtils.dip2px(CommonApplication.mApplication, 20), 0, false);
 
     }
 

@@ -35,6 +35,7 @@ import com.tencent.xiaowei.control.XWeiControl;
 import com.tencent.xiaowei.def.XWCommonDef;
 import com.tencent.xiaowei.info.XWRequestInfo;
 import com.tencent.xiaowei.info.XWResponseInfo;
+import com.tencent.xiaowei.sdk.XWDeviceBaseManager;
 import com.tencent.xiaowei.sdk.XWSDK;
 import com.tencent.xiaowei.util.QLog;
 import com.tencent.xiaowei.util.Singleton;
@@ -103,24 +104,13 @@ public class RecordDataManager implements Runnable, XWSDK.AudioRequestListener {
     private AudioManager.OnAudioFocusChangeListener onAudioFocusChangeListener = new AudioManager.OnAudioFocusChangeListener() {
         @Override
         public void onAudioFocusChange(int focusChange) {
-            QLog.d(TAG, "onAudioFocusChange " + focusChange);
-            if (focusChange == AudioManager.AUDIOFOCUS_LOSS || focusChange == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT) {
-                recognizeRequestInfo.reset();
-                isRecognizing = false;
-                keepSilence = false;
-                changeVoiceState(STATE_WAKEUP, mVoiceState);
-                wakeupVoiceId = null;
-                recognizeVoiceId = null;
-                sendBroadcast(ACTION_DEF_ANIM_STOP, null);
-                XWSDK.getInstance().requestCancel("");// 通知SDK强制取消这次请求
-                CommonApplication.mAudioManager.abandonAudioFocus(onAudioFocusChangeListener);
-            }
+
         }
     };
 
     @Override
     public boolean onRequest(String voiceId, int event, XWResponseInfo rspData, byte[] extendData) {
-        QLog.e(TAG, "[" + voiceId + "]:" + event + " " + rspData);
+        QLog.e(TAG, XWDeviceBaseManager.getSelfDin() + " [" + voiceId + "]:" + event + " " + rspData);
         switch (event) {
             case XWCommonDef.XWEvent.ON_IDLE:
                 keepSilence = false;
@@ -142,7 +132,7 @@ public class RecordDataManager implements Runnable, XWSDK.AudioRequestListener {
                 XWeiControl.getInstance().processResponse(voiceId,
                         event, rspData, extendData);
                 if (audioDataListener != null) {
-                    audioDataListener.notifyRequestEvent(XWCommonDef.XWEvent.ON_REQUEST_START, 0);
+                    audioDataListener.notifyRequestEvent(XWCommonDef.XWEvent.ON_REQUEST_START, 0, rspData);
                 }
 
                 if (isFreeWakupMode(recognizeRequestInfo)) {
@@ -169,7 +159,7 @@ public class RecordDataManager implements Runnable, XWSDK.AudioRequestListener {
                 changeVoiceState(STATE_WAKEUP, mVoiceState);
 
                 if (audioDataListener != null) {
-                    audioDataListener.notifyRequestEvent(XWCommonDef.XWEvent.ON_SILENT, 0);
+                    audioDataListener.notifyRequestEvent(XWCommonDef.XWEvent.ON_SILENT, 0, rspData);
 
                 }
                 break;
@@ -191,9 +181,13 @@ public class RecordDataManager implements Runnable, XWSDK.AudioRequestListener {
                 }
 
                 break;
+            case XWCommonDef.XWEvent.ON_RESPONSE_INTERMEDIATE:
+                // 控制层处理ASR/NLP的数据
+                XWeiControl.getInstance().processResponse(voiceId, rspData, extendData);
+                break;
             case XWCommonDef.XWEvent.ON_RESPONSE:
                 if (audioDataListener != null) {
-                    audioDataListener.notifyRequestEvent(XWCommonDef.XWEvent.ON_RESPONSE, rspData.resultCode);
+                    audioDataListener.notifyRequestEvent(XWCommonDef.XWEvent.ON_RESPONSE, rspData.resultCode, rspData);
                     audioDataListener = null;
                 }
 
@@ -286,32 +280,31 @@ public class RecordDataManager implements Runnable, XWSDK.AudioRequestListener {
 
     }
 
+    public void cancelWakeupStatus() {
+        recognizeRequestInfo.reset();
+        isRecognizing = false;
+        isThinking = false;
+        keepSilence = false;
+        changeVoiceState(STATE_WAKEUP, mVoiceState);
+        wakeupVoiceId = null;
+        recognizeVoiceId = null;
+        sendBroadcast(ACTION_DEF_ANIM_STOP, null);
+        XWSDK.getInstance().requestCancel("");// 通知SDK强制取消这次请求
+        CommonApplication.mAudioManager.abandonAudioFocus(onAudioFocusChangeListener);
+        onAudioFocusChangeListener.onAudioFocusChange(AudioManager.AUDIOFOCUS_LOSS);
+    }
 
     private void dealRsp(String voiceId, XWResponseInfo rspData, byte[] extendData) {
         QLog.d(TAG, "recognize end voiceId:" + voiceId + " text:" + rspData.requestText);
+        QLog.d(TAG, "responseData" + rspData.responseData);
         MainActivity.setUITips("收到响应：" + voiceId + ((rspData.resultCode != 0) ? " 错误码：" + rspData.resultCode : "") + " skillName:" + rspData.appInfo.name);
-        isRecognizing = false;
-        isThinking = false;
-        recognizeRequestInfo.reset();
 
         // 清理自定义设备状态
         XWSDK.getInstance().clearUserState();
 
-        //  需要播放东西了，先申请系统焦点，如果是不可恢复的，请求短期焦点，否则请求长期焦点。
-//        int duration = rspData.recoveryAble ? AudioManager.AUDIOFOCUS_GAIN : AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_EXCLUSIVE;
-//        CommonApplication.mAudioManager.requestAudioFocus(onAudioFocusChangeListener, AudioManager.STREAM_MUSIC, duration);
-
         // 控制层处理ASR/NLP的数据
         XWeiControl.getInstance().processResponse(voiceId, rspData, extendData);
-
-        // 收到了语音请求的结果，处理后，取消唤醒的焦点（如果已经被取消了，可以重复调用）。
-        mHandler.postDelayed(new Runnable() {
-            @Override
-            public void run() {
-                CommonApplication.mAudioManager.abandonAudioFocus(onAudioFocusChangeListener);
-                onAudioFocusChangeListener.onAudioFocusChange(AudioManager.AUDIOFOCUS_LOSS);
-            }
-        }, 500);
+        cancelWakeupStatus();
     }
 
     public void stop() {
@@ -563,10 +556,8 @@ public class RecordDataManager implements Runnable, XWSDK.AudioRequestListener {
     }
 
     public void onSleep() {
-        CommonApplication.mAudioManager.abandonAudioFocus(onAudioFocusChangeListener);
-        onAudioFocusChangeListener.onAudioFocusChange(AudioManager.AUDIOFOCUS_LOSS);
+        cancelWakeupStatus();
         changeVoiceState(STATE_WAKEUP, mVoiceState);
-        XWSDK.getInstance().requestCancel("");// 通知SDK强制取消这次请求
     }
 
     public void setWakeupEnable(boolean enable) {
@@ -615,7 +606,7 @@ public class RecordDataManager implements Runnable, XWSDK.AudioRequestListener {
 
         void onFeedAudioData(byte[] audioData);
 
-        void notifyRequestEvent(int event, int errCode);
+        void notifyRequestEvent(int event, int errCode, XWResponseInfo rsp);
     }
 
 }

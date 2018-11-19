@@ -316,6 +316,9 @@ void CSkillControl::Release()
         Stop();
         ClearList();
         ClearMediaList();
+        delay_events_.clear();
+        
+        control_callback_.control_callback(id_, ACT_PLAYER_FINISH, 0, 0);
         TLOG_DEBUG("sessionId=%d CSkillControl::Release XWM_LIST_REMOVED", id_);
     }
 }
@@ -447,7 +450,7 @@ bool CSkillControl::Next(long skip, bool isAuto)
 
             post_message(id_, XWM_PLAYER_STATUS_FINISH, NULL, NULL, 0);
 
-            control_callback_.control_callback(id_, ACT_PLAYER_FINISH, 0, 0);
+//            control_callback_.control_callback(id_, ACT_PLAYER_FINISH, 0, 0);
         }
         else
         {

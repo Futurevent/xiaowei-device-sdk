@@ -207,7 +207,7 @@ bool CXWeiAudioEngine::OnCallbackRequest(const char *voice_id, TXCA_EVENT event,
     // 查看应用层是否有注册监听器
     if (m_listener != NULL)
     {
-        handled = m_listener->OnRequest(event);
+        handled = m_listener->OnRequest(event, reinterpret_cast<const TXCA_PARAM_RESPONSE *>(state_info));
         if (event == txca_event_on_response)
         {
             m_listener = NULL;
@@ -412,10 +412,11 @@ bool CXWeiAudioEngine::Init()
     outer_skill_callback.send_txca_response = send_txca_response;
     outer_skill_callback.on_message = on_message;
 
-    // QQ消息处理
-    OutSkillHandler *handler = new QQMsgSkillHandler();
+    // 消息处理
+    OutSkillHandler *handler = new MsgSkillHandler();
     g_xwei_transfer_mgr.Init();
     XWeiOutSkillManager::instance()->registerSkillId(DEF_TXCA_SKILL_ID_QQMSG, handler);
+    XWeiOutSkillManager::instance()->registerSkillId(DEF_TXCA_SKILL_ID_WECHAT_MSG, handler);
 
     printf("CTXAIAAudioEngine.Init.\n");
     m_isInited = true;

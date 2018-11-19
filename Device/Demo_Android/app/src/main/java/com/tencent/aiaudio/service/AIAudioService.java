@@ -227,7 +227,7 @@ public class AIAudioService extends Service {
             @Override
             public void onDelay(String voiceId, long time) {
                 if (WakeupAnimatorService.getInstance() != null)
-                    WakeupAnimatorService.getInstance().setNetText(time + "ms");
+                    WakeupAnimatorService.getInstance().setNetText("net:" + time / 2 + "ms");
             }
         });
     }
@@ -400,7 +400,7 @@ public class AIAudioService extends Service {
                 if (AVChatManager.putAudioData(buffer, read_len)) {
 //                    continue;
                 }
-                RecordDataManager.getInstance().feedData(buffer);
+                RecordDataManager.getInstance().feedData(buffer);// buffer长度必须是32的倍数，建议每次传入的buffer大小在640-2048之间，不能超过6400。识别非常慢可以检查这个值的范围。
             }
             audioRecorder.stop();
             RecordDataManager.getInstance().stop();

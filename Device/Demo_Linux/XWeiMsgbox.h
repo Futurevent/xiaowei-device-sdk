@@ -25,11 +25,17 @@
 #include <vector>
 #include <sstream>
 
-enum qq_msg_type
+#define WECHAT_MSG_TYPE_VOICE "voice"
+#define WECHAT_MSG_TYPE_TEXT "text"
+
+enum msg_type
 {
     qq_msg_type_invalid = 0,
     qq_msg_type_iot_audio = 1,
     qq_msg_type_iot_text = 2,
+    wechat_msg_type_text = 3,
+    wechat_msg_type_audio_url = 4,
+    wechat_msg_type_audio_file = 5,
 };
 
 //消息结构的基础信息
@@ -75,6 +81,20 @@ class CXWeiMsgAudio : public XWeiCMsgBase
 
     bool isPlayable() const;
     void Clear();
+
+    virtual void ToString(std::stringstream &ss) const;
+};
+
+class CXWeiMsgWechat : public XWeiCMsgBase
+{
+  public:
+    CXWeiMsgWechat();
+    virtual ~CXWeiMsgWechat();
+
+    std::string from;
+    std::string content;
+    std::string remark;
+    std::string headurl;
 
     virtual void ToString(std::stringstream &ss) const;
 };

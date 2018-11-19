@@ -16,30 +16,35 @@
  */
 package com.tencent.aiaudio.msg;
 
-import android.content.Context;
 import android.media.AudioManager;
 import android.os.Environment;
 import android.text.TextUtils;
 import android.util.Log;
 
 import com.tencent.aiaudio.CommonApplication;
+import com.tencent.aiaudio.msg.data.MsgEntry;
 import com.tencent.aiaudio.msg.data.OnOperationFinishListener;
-import com.tencent.aiaudio.msg.data.QQMsgEntry;
 import com.tencent.aiaudio.wakeup.RecordDataManager;
 import com.tencent.utils.MusicPlayer;
+import com.tencent.xiaowei.control.Constants;
 import com.tencent.xiaowei.control.XWeiAudioFocusManager;
+import com.tencent.xiaowei.control.XWeiControl;
 import com.tencent.xiaowei.control.XWeiOuterSkill;
 import com.tencent.xiaowei.def.XWCommonDef;
+import com.tencent.xiaowei.info.XWAppInfo;
 import com.tencent.xiaowei.info.XWFileTransferInfo;
 import com.tencent.xiaowei.info.XWRequestInfo;
 import com.tencent.xiaowei.info.XWResGroupInfo;
 import com.tencent.xiaowei.info.XWResourceInfo;
 import com.tencent.xiaowei.info.XWResponseInfo;
 import com.tencent.xiaowei.info.XWeiMessageInfo;
+import com.tencent.xiaowei.sdk.XWDeviceBaseManager;
 import com.tencent.xiaowei.sdk.XWFileTransferManager;
 import com.tencent.xiaowei.sdk.XWSDK;
 import com.tencent.xiaowei.sdk.XWeiMsgManager;
 import com.tencent.xiaowei.util.JsonUtil;
+import com.tencent.xiaowei.util.QLog;
+import com.tencent.xiaowei.util.Singleton;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -56,24 +61,42 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 
 import io.kvh.media.amr.AmrEncoder;
 
-import static com.tencent.aiaudio.msg.data.QQMsgEntry.MSG_TYPE_AUDIO;
-import static com.tencent.aiaudio.msg.data.QQMsgEntry.MSG_TYPE_TEXT;
+import static com.tencent.aiaudio.msg.data.MsgEntry.MSG_TYPE_QQ_AUDIO_FILE;
+import static com.tencent.aiaudio.msg.data.MsgEntry.MSG_TYPE_QQ_TEXT;
+import static com.tencent.aiaudio.msg.data.MsgEntry.MSG_TYPE_WECHAT_AUDIO_FILE;
+import static com.tencent.aiaudio.msg.data.MsgEntry.MSG_TYPE_WECHAT_AUDIO_URL;
+import static com.tencent.aiaudio.msg.data.MsgEntry.MSG_TYPE_WECHAT_TEXT;
+import static com.tencent.xiaowei.info.XWBinderInfo.BINDER_TINYID_TYPE_WX;
 
+/**
+ * QQ消息和微信小微的处理器
+ */
 public class SkillMsgHandler implements XWeiOuterSkill.OuterSkillHandler, RecordDataManager.AudioDataListener {
 
 
     private static final String TAG = SkillMsgHandler.class.getSimpleName();
     private static final String MSG_RING = "http://qzonestyle.gtimg.cn/qzone/vas/opensns/res/doc/msg.ring.mp3";
-    private static final int MSG_RECORD_SPEAK_TIMEOUT = 5000;  // 用户5s没有说话，则超时，并取消发送消息
     private static final int MSG_RECORD_SILENT = 2000;         // VAD尾点时间改为2000ms，防止用户没有说完
     private static final String COMMAND_SEND_AUDIO_MSG = "11018";
     private static final String COMMAND_RCV_TEXT_MSG = "10000";        // 收到文本消息
     private static final String COMMAND_RCV_AUDIO_MSG = "10003";       // 收到语音消息
     private static final String COMMAND_PLAY_MSG = "700125";       // 播放消息
 
-    private Context mContext;
     private int mSessionId = -1;
 
+    private static Singleton<SkillMsgHandler> sSingleton;
+
+    public static SkillMsgHandler getInstance() {
+        if (sSingleton == null) {
+            sSingleton = new Singleton<SkillMsgHandler>() {
+                @Override
+                protected SkillMsgHandler createInstance() {
+                    return new SkillMsgHandler();
+                }
+            };
+        }
+        return sSingleton.getInstance();
+    }
 
     private MusicPlayer player = new MusicPlayer();
     private ArrayList<XWResourceInfo> playList = new ArrayList<>();
@@ -87,7 +110,7 @@ public class SkillMsgHandler implements XWeiOuterSkill.OuterSkillHandler, Record
                     RecordDataManager.getInstance().onWakeup(mRequestInfo, SkillMsgHandler.this);
                     mRequestInfo = null;
                 } else {
-                    Log.e(TAG, "onCompletion mContextInfo is null");
+                    Log.e(TAG, "onCompletion mRequestInfo is null");
                 }
                 CommonApplication.mAudioManager.abandonAudioFocus(listener);
             } else {
@@ -95,7 +118,7 @@ public class SkillMsgHandler implements XWeiOuterSkill.OuterSkillHandler, Record
             }
         }
     };
-    private long mTargetId;
+    private String mTargetId;
     private long duration;
     ByteArrayOutputStream baos = new ByteArrayOutputStream();
     private XWRequestInfo mRequestInfo = null;
@@ -123,11 +146,11 @@ public class SkillMsgHandler implements XWeiOuterSkill.OuterSkillHandler, Record
                 player.playMediaInfo(resourceInfo, this);
 
                 if (resourceInfo.format == XWCommonDef.ResourceFormat.TEXT
-                        || resourceInfo.format == XWCommonDef.ResourceFormat.FILE) {
+                        || resourceInfo.format == XWCommonDef.ResourceFormat.FILE || resourceInfo.format == XWCommonDef.ResourceFormat.URL) {
                     MsgBoxManager.getInstance().setMsgRead(Integer.valueOf(resourceInfo.ID));
                 }
             } else if (mPlayState == STATE_LOOP_PLAYING) {
-                QQMsgEntry entry = MsgBoxManager.getInstance().getNextMsg();
+                MsgEntry entry = MsgBoxManager.getInstance().getNextMsg();
                 if (entry != null) {
                     XWResourceInfo[] resourceInfos = msgEntryToMedias(entry);
                     for (XWResourceInfo res : resourceInfos) {
@@ -139,7 +162,7 @@ public class SkillMsgHandler implements XWeiOuterSkill.OuterSkillHandler, Record
                     XWResourceInfo tmpRes = new XWResourceInfo();
                     tmpRes.format = XWCommonDef.ResourceFormat.TEXT;
                     tmpRes.ID = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-                    tmpRes.content = "没有更多消息了";
+                    tmpRes.content = "没有更多未读消息了";
                     playTipMsg(tmpRes, XWeiAudioFocusManager.AUDIOFOCUS_GAIN_TRANSIENT);
 
                     mPlayState = STATE_IDLE;
@@ -153,9 +176,7 @@ public class SkillMsgHandler implements XWeiOuterSkill.OuterSkillHandler, Record
         }
     };
 
-    public SkillMsgHandler(Context context) {
-        this.mContext = context;
-
+    public SkillMsgHandler() {
         MsgBoxManager.getInstance().init();
     }
 
@@ -189,7 +210,7 @@ public class SkillMsgHandler implements XWeiOuterSkill.OuterSkillHandler, Record
     }
 
     /**
-     * 处理QQ消息接收
+     * 处理消息接收
      *
      * @param rspInfo 资源信息
      * @return 是否已处理响应
@@ -201,13 +222,29 @@ public class SkillMsgHandler implements XWeiOuterSkill.OuterSkillHandler, Record
                 && rspInfo.resources[0].resources[0].format == XWCommonDef.ResourceFormat.COMMAND
                 && (rspInfo.resources[0].resources[0].ID.equals(COMMAND_RCV_TEXT_MSG)
                 || rspInfo.resources[0].resources[0].ID.equals(COMMAND_RCV_AUDIO_MSG))) {
+            if (Constants.SkillIdDef.SKILL_ID_QQ_MSG.equals(rspInfo.appInfo.ID)) {
+                if (rspInfo.resources[0].resources[0].ID.equals(COMMAND_RCV_TEXT_MSG)) {
+                    processTextMsg(rspInfo.appInfo, rspInfo.resources[0].resources[0]);
+                } else {
+                    processAudioMsg(rspInfo.appInfo, rspInfo.resources[0].resources[0]);
+                }
 
-            if (rspInfo.resources[0].resources[0].ID.equals(COMMAND_RCV_TEXT_MSG)) {
-                processTextMsg(rspInfo.resources[0].resources[0]);
-            } else {
-                processAudioMsg(rspInfo.resources[0].resources[0]);
+            } else if (Constants.SkillIdDef.SKILL_ID_WECHAT_MSG.equals(rspInfo.appInfo.ID)) {
+                WechatMsgInfo textWechatMsgInfo = JsonUtil.getObject(rspInfo.resources[0].resources[0].content, WechatMsgInfo.class);
+                if (textWechatMsgInfo == null || TextUtils.isEmpty(textWechatMsgInfo.content)) {
+                    Log.e(TAG, "processTextMsg text is null");
+                    return false;
+                }
+                MsgEntry entry = new MsgEntry(textWechatMsgInfo);
+                entry.setTimeStamp(System.currentTimeMillis() / 1000);
+                MsgBoxManager.getInstance().addMsg(entry, new OnOperationFinishListener() {
+                    @Override
+                    public void onOperationFinish(MsgEntry entry, String action) {
+                        playOnceMsg(entry);
+                    }
+                });
+
             }
-
             return true;
         }
 
@@ -221,15 +258,16 @@ public class SkillMsgHandler implements XWeiOuterSkill.OuterSkillHandler, Record
      *
      * @param resourceInfo 资源信息
      */
-    private void processTextMsg(XWResourceInfo resourceInfo) {
-        if (TextUtils.isEmpty(resourceInfo.content) || TextUtils.isEmpty(resourceInfo.extendInfo)) {
+    private void processTextMsg(XWAppInfo appInfo, XWResourceInfo resourceInfo) {
+        if (TextUtils.isEmpty(resourceInfo.content) && TextUtils.isEmpty(resourceInfo.extendInfo)) {
             Log.e(TAG, "processTextMsg content is null or extendInfo is null");
             return;
         }
 
+
         long sender = 0;
 
-        TextMsgInfo textMsgInfo = JsonUtil.getObject(resourceInfo.content, TextMsgInfo.class);
+        TextQQMsgInfo textQQMsgInfo = JsonUtil.getObject(resourceInfo.content, TextQQMsgInfo.class);
 
         try {
             JSONObject jsonObject = new JSONObject(resourceInfo.extendInfo);
@@ -238,20 +276,21 @@ public class SkillMsgHandler implements XWeiOuterSkill.OuterSkillHandler, Record
             e.printStackTrace();
         }
 
-        if (sender == 0 || textMsgInfo == null || TextUtils.isEmpty(textMsgInfo.getText())) {
+        if (sender == 0 || textQQMsgInfo == null || TextUtils.isEmpty(textQQMsgInfo.getText())) {
             Log.e(TAG, "processTextMsg sender is 0 or text is null");
             return;
         }
 
-        QQMsgEntry entry = new QQMsgEntry(sender, textMsgInfo);
+        MsgEntry entry = new MsgEntry(sender, textQQMsgInfo);
         entry.setTimeStamp(System.currentTimeMillis() / 1000);
 
         MsgBoxManager.getInstance().addMsg(entry, new OnOperationFinishListener() {
             @Override
-            public void onOperationFinish(QQMsgEntry entry, String action) {
+            public void onOperationFinish(MsgEntry entry, String action) {
                 playOnceMsg(entry);
             }
         });
+
     }
 
 
@@ -260,7 +299,7 @@ public class SkillMsgHandler implements XWeiOuterSkill.OuterSkillHandler, Record
      *
      * @param resourceInfo 资源信息
      */
-    private void processAudioMsg(XWResourceInfo resourceInfo) {
+    private void processAudioMsg(XWAppInfo appInfo, XWResourceInfo resourceInfo) {
         if (TextUtils.isEmpty(resourceInfo.content) || TextUtils.isEmpty(resourceInfo.extendInfo)) {
             Log.e(TAG, "processAudioMsg content is null or extendInfo is null");
             return;
@@ -282,7 +321,7 @@ public class SkillMsgHandler implements XWeiOuterSkill.OuterSkillHandler, Record
             return;
         }
 
-        final QQMsgEntry entry = new QQMsgEntry(sender, downloadInfo);
+        final MsgEntry entry = new MsgEntry(sender, downloadInfo);
         entry.setTimeStamp(System.currentTimeMillis() / 1000);
 
         XWFileTransferManager.downloadMiniFile(downloadInfo.getFile_key(),
@@ -300,7 +339,7 @@ public class SkillMsgHandler implements XWeiOuterSkill.OuterSkillHandler, Record
                             entry.setContent(info.filePath);
                             MsgBoxManager.getInstance().addMsg(entry, new OnOperationFinishListener() {
                                 @Override
-                                public void onOperationFinish(QQMsgEntry entry, String action) {
+                                public void onOperationFinish(MsgEntry entry, String action) {
                                     playOnceMsg(entry);
                                 }
                             });
@@ -318,30 +357,38 @@ public class SkillMsgHandler implements XWeiOuterSkill.OuterSkillHandler, Record
      * @param entry 消息实体
      * @return 播放资源列表
      */
-    private XWResourceInfo[] msgEntryToMedias(QQMsgEntry entry) {
+    private XWResourceInfo[] msgEntryToMedias(MsgEntry entry) {
         XWResourceInfo[] resList = new XWResourceInfo[2];
 
-        String resId = XWSDK.getInstance().request("TTS_TIPS", "qq_msg", "{\"tiny_id\":" + entry.getSender() + ",\"timestamp\":" + entry.getTimeStamp() + "}", null);
+        String resId;
+        if (entry.getMsgType() == MSG_TYPE_QQ_TEXT || entry.getMsgType() == MSG_TYPE_QQ_AUDIO_FILE) {
+            resId = XWSDK.getInstance().request("TTS_TIPS", "qq_msg", "{\"tiny_id\":" + entry.getSender() + ",\"timestamp\":" + entry.getTimeStamp() + "}", null);
+        } else {
+            resId = XWSDK.getInstance().request("TTS_TIPS", "wechat_msg", "{\"open_id\":\"" + entry.getSenderOpenId() + "\",\"timestamp\":" + entry.getTimeStamp() + "}", null);
+        }
         XWResourceInfo resourceInfo = new XWResourceInfo();
         resourceInfo.ID = resId;
         resourceInfo.format = XWCommonDef.ResourceFormat.TTS;
 
-
         resList[0] = resourceInfo;
 
         resourceInfo = new XWResourceInfo();
-        if (entry.getMsgType() == MSG_TYPE_TEXT) {
+        if (entry.getMsgType() == MSG_TYPE_QQ_TEXT || entry.getMsgType() == MSG_TYPE_WECHAT_TEXT) {
             resourceInfo.ID = String.valueOf(entry.getId());
             resourceInfo.format = XWCommonDef.ResourceFormat.TEXT;
             resourceInfo.content = entry.getContent();
             resList[1] = resourceInfo;
-        } else {
+        } else if (entry.getMsgType() == MSG_TYPE_QQ_AUDIO_FILE || entry.getMsgType() == MSG_TYPE_WECHAT_AUDIO_FILE) {
             resourceInfo.ID = String.valueOf(entry.getId());
             resourceInfo.format = XWCommonDef.ResourceFormat.FILE;
             resourceInfo.content = entry.getContent();
             resList[1] = resourceInfo;
+        } else if (entry.getMsgType() == MSG_TYPE_WECHAT_AUDIO_URL) {
+            resourceInfo.ID = String.valueOf(entry.getId());
+            resourceInfo.format = XWCommonDef.ResourceFormat.URL;
+            resourceInfo.content = entry.getContent();
+            resList[1] = resourceInfo;
         }
-
 
         return resList;
     }
@@ -351,7 +398,7 @@ public class SkillMsgHandler implements XWeiOuterSkill.OuterSkillHandler, Record
      *
      * @param entry 消息实体
      */
-    private void playOnceMsg(QQMsgEntry entry) {
+    private void playOnceMsg(MsgEntry entry) {
         Log.d(TAG, "playOnceMsg: " + entry.toString());
 
         if (RecordDataManager.getInstance().isDeviceActive()) {
@@ -406,11 +453,11 @@ public class SkillMsgHandler implements XWeiOuterSkill.OuterSkillHandler, Record
                 Log.e(TAG, "processSendMsg targetId is empty");
             }
 
-            mTargetId = Long.valueOf(rspInfo.resources[0].resources[0].content);
+            mTargetId = rspInfo.resources[0].resources[0].content;
 
             mRequestInfo = new XWRequestInfo();
             mRequestInfo.requestParam |= XWCommonDef.REQUEST_PARAM.REQUEST_PARAM_ONLY_VAD;
-            mRequestInfo.speakTimeout = MSG_RECORD_SPEAK_TIMEOUT;
+            mRequestInfo.speakTimeout = rspInfo.context.speakTimeout;
             mRequestInfo.silentTimeout = MSG_RECORD_SILENT;
 
             playList.clear();
@@ -465,7 +512,7 @@ public class SkillMsgHandler implements XWeiOuterSkill.OuterSkillHandler, Record
                 && rspInfo.resources[0].resources[0].format == XWCommonDef.ResourceFormat.COMMAND
                 && rspInfo.resources[0].resources[0].ID.equals(COMMAND_PLAY_MSG)) {
 
-            QQMsgEntry entry = MsgBoxManager.getInstance().getNextMsg();
+            MsgEntry entry = MsgBoxManager.getInstance().getNextMsg();
             if (entry != null) {
                 XWResourceInfo[] resList = msgEntryToMedias(entry);
                 for (XWResourceInfo item : resList) {
@@ -498,7 +545,7 @@ public class SkillMsgHandler implements XWeiOuterSkill.OuterSkillHandler, Record
                 XWResourceInfo tmpRes = new XWResourceInfo();
                 tmpRes.format = XWCommonDef.ResourceFormat.TEXT;
                 tmpRes.ID = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-                tmpRes.content = "没有更多消息了";
+                tmpRes.content = "没有更多未读消息了";
                 playTipMsg(tmpRes, XWeiAudioFocusManager.AUDIOFOCUS_GAIN_TRANSIENT);
             }
 
@@ -594,7 +641,7 @@ public class SkillMsgHandler implements XWeiOuterSkill.OuterSkillHandler, Record
     }
 
     /**
-     * AMR压缩处理
+     * QQ消息需要 AMR压缩处理
      *
      * @param pcm     PCM数据
      * @param amrPath AMR压缩后存储路径
@@ -613,14 +660,14 @@ public class SkillMsgHandler implements XWeiOuterSkill.OuterSkillHandler, Record
             out.write(0x52);
             out.write(0x0A);
 
-            int voiceLength = pcm.length;
+            int voiceLength = pcm.length - MSG_RECORD_SILENT * 32;// 去掉2s末尾静音数据
 
-            if (pcm.length > 0) {
-                String tmpFile = Environment.getExternalStoragePublicDirectory("tencent") + "/device/file/" + "pcm_" + voiceLength + ".pcm";
-                OutputStream out2 = new FileOutputStream(tmpFile);
-                out2.write(pcm, 0, pcm.length);
-                out2.close();
-            }
+//            if (voiceLength > 0) {
+//                String tmpFile = Environment.getExternalStoragePublicDirectory("tencent") + "/device/file/" + "pcm_" + voiceLength + ".pcm";
+//                OutputStream out2 = new FileOutputStream(tmpFile);
+//                out2.write(pcm, 0, voiceLength);
+//                out2.close();
+//            }
 
             int pcmSize = 640;
             int amrSize = 320;
@@ -654,6 +701,11 @@ public class SkillMsgHandler implements XWeiOuterSkill.OuterSkillHandler, Record
 
             out.close();
         } catch (IOException e) {
+            XWResourceInfo tmpRes = new XWResourceInfo();
+            tmpRes.format = XWCommonDef.ResourceFormat.TEXT;
+            tmpRes.ID = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+            tmpRes.content = "发送失败，存储空间不够了。";
+            playTipMsg(tmpRes, XWeiAudioFocusManager.AUDIOFOCUS_GAIN_TRANSIENT);
             e.printStackTrace();
         }
 
@@ -672,7 +724,7 @@ public class SkillMsgHandler implements XWeiOuterSkill.OuterSkillHandler, Record
     }
 
     @Override
-    public void notifyRequestEvent(int event, int errCode) {
+    public void notifyRequestEvent(int event, int errCode, final XWResponseInfo rsp) {
         Log.d(TAG, "notifyRequestEvent event: " + event + " errCode: " + errCode);
         switch (event) {
             case XWCommonDef.XWEvent.ON_REQUEST_START:
@@ -688,46 +740,99 @@ public class SkillMsgHandler implements XWeiOuterSkill.OuterSkillHandler, Record
                     // 用户没有说话，就取消发送语音消息
                 } else {
                     //编码语音文件amr
-                    final String amrPath = Environment.getExternalStoragePublicDirectory("tencent") + "/device/file/" + "qqmsg_send_" + duration + ".amr";
+                    final String amrPath = Environment.getExternalStoragePublicDirectory("tencent") + "/device/file/" + "msg_send_" + duration + ".amr";
                     encodeVoiceData2Amr(baos.toByteArray(), amrPath);
 
                     baos.reset();
 
-                    //发送文件
-                    final XWeiMessageInfo msg = new XWeiMessageInfo();
-                    msg.type = XWeiMessageInfo.TYPE_AUDIO;
-                    msg.receiver = new ArrayList<>();
-                    msg.receiver.add(String.valueOf(mTargetId));
-                    msg.content = amrPath;
+                    if (XWDeviceBaseManager.getBinderTinyIDType() != BINDER_TINYID_TYPE_WX) {
+                        //发送
+                        final XWeiMessageInfo msg = new XWeiMessageInfo();
+                        msg.type = XWeiMessageInfo.TYPE_AUDIO;
+                        msg.receiver = new ArrayList<>();
+                        msg.receiver.add(String.valueOf(mTargetId));
+                        msg.content = amrPath;
 
-                    XWeiMsgManager.sendMessage(msg, new XWeiMsgManager.OnSendMessageListener() {
+                        XWeiMsgManager.sendMessage(msg, new XWeiMsgManager.OnSendMessageListener() {
 
-                        @Override
-                        public void onProgress(long transferProgress, long maxTransferProgress) {
+                            @Override
+                            public void onProgress(long transferProgress, long maxTransferProgress) {
 
-                        }
-
-                        @Override
-                        public void onComplete(int errCode) {
-                            Log.d(TAG, "sendMessage errCode " + errCode);
-                            if (errCode == 0) {
-                                QQMsgEntry entry = new QQMsgEntry();
-                                entry.setRcv(false);
-                                entry.setTimeStamp(System.currentTimeMillis());
-                                entry.setHasRead(true);
-                                entry.setDuration((int) duration);
-                                entry.setContent(amrPath);
-                                entry.setMsgType(MSG_TYPE_AUDIO);
-                                Log.d(TAG, "sendMessage msg: " + entry.toString());
-                                MsgBoxManager.getInstance().addMsg(entry, null);
-                                playTipMsg(MSG_RING, XWeiAudioFocusManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK);
                             }
-                        }
-                    });
+
+                            @Override
+                            public void onComplete(int errCode) {
+                                Log.d(TAG, "sendMessage errCode " + errCode);
+                                if (errCode == 0) {
+                                    MsgEntry entry = new MsgEntry();
+                                    entry.setRcv(false);
+                                    entry.setTimeStamp(System.currentTimeMillis());
+                                    entry.setHasRead(true);
+                                    entry.setDuration((int) duration);
+                                    entry.setContent(amrPath);
+                                    entry.setMsgType(MSG_TYPE_QQ_AUDIO_FILE);
+                                    Log.d(TAG, "sendMessage msg: " + entry.toString());
+                                    MsgBoxManager.getInstance().addMsg(entry, null);
+                                    playTipMsg(MSG_RING, XWeiAudioFocusManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK);
+                                }
+                            }
+                        });
+                    } else {
+                        // 上传文件换回url
+                        XWFileTransferManager.uploadFile(amrPath, XWFileTransferInfo.TYPE_TRANSFER_CHANNEL_MINI, XWFileTransferInfo.TYPE_TRANSFER_FILE_OTHER, new XWFileTransferManager.OnFileTransferListener() {
+                            @Override
+                            public void onProgress(long transferProgress, long maxTransferProgress) {
+
+                            }
+
+                            @Override
+                            public void onComplete(XWFileTransferInfo info, int errorCode) {
+                                if (errorCode == 0) {
+                                    String url = XWFileTransferManager.getMiniDownloadURL(new String(info.fileKey), XWFileTransferInfo.TYPE_TRANSFER_FILE_OTHER) + "&filename=msg_" + XWDeviceBaseManager.getSelfDin() + ".amr";
+
+                                    MsgEntry entry = new MsgEntry();
+                                    entry.setRcv(false);
+                                    entry.setTimeStamp(System.currentTimeMillis());
+                                    entry.setHasRead(true);
+                                    entry.setDuration((int) duration);
+                                    entry.setContent(amrPath);
+                                    entry.setMsgType(MSG_TYPE_WECHAT_AUDIO_FILE);
+                                    Log.d(TAG, "sendMessage msg: " + entry.toString());
+                                    MsgBoxManager.getInstance().addMsg(entry, null);
+                                    playTipMsg(MSG_RING, XWeiAudioFocusManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK);
+
+                                    String toUser = mTargetId;
+
+                                    String params = "{\"url\":\"" + url + "\",\"touser\":\"" + toUser + "\",\"msgtype\":\"voice\"}";
+                                    // 发送给小微后台转发到微信
+                                    XWSDK.getInstance().request("SEND_MSG", "wechat_msg", params, new XWSDK.OnRspListener() {
+                                        @Override
+                                        public void onRsp(String voiceId, int error, String json) {
+                                            XWResponseInfo rspData = XWResponseInfo.fromCmdJson(json);
+                                            if (rspData.resources != null && rspData.resources.length > 0)
+                                                XWeiControl.getInstance().processResponse(voiceId, rspData, null);
+                                        }
+                                    });
+                                } else {
+                                    QLog.e(TAG, "发送微信消息失败 " + errorCode);
+                                    XWResourceInfo tmpRes = new XWResourceInfo();
+                                    tmpRes.format = XWCommonDef.ResourceFormat.TEXT;
+                                    tmpRes.ID = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+                                    tmpRes.content = "消息发送失败，请检查网络连接。";
+                                    playTipMsg(tmpRes, XWeiAudioFocusManager.AUDIOFOCUS_GAIN_TRANSIENT);
+                                }
+                            }
+                        });
+
+                    }
                 }
                 break;
             default:
                 break;
         }
+    }
+
+    public void onUnBind() {
+        MsgBoxManager.getInstance().deleteAll();
     }
 }

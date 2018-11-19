@@ -51,12 +51,7 @@ public class XWeiControl {
         boolean load_failed = false;
         String[] so = {"stlport_shared", "xiaoweiSDK", "xiaowei", "CtrlModule", "control"};
         for (String s : so) {
-            try {
-                System.loadLibrary(s);
-            } catch (UnsatisfiedLinkError e) {
-                load_failed = true;
-                e.printStackTrace();
-            }
+            System.loadLibrary(s);
         }
 
         if (!load_failed) {

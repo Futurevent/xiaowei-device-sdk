@@ -235,11 +235,6 @@ public class Constants {
         String SKILL_ID_QQ_MSG = "8dab4796-fa37-4114-0002-7637fa2b0001";
 
         /**
-         * 消息盒子
-         */
-        String SKILL_ID_MSGBOX = "8dab4796-fa37-4114-0012-7637fa2b0002";
-
-        /**
          * 导航
          */
         String SKILL_ID_NAV = "8dab4796-fa37-4114-0015-7637fa2b0001";
@@ -248,6 +243,11 @@ public class Constants {
          * 视频
          */
         String SKILL_ID_VIDEO = "8dab4796-fa37-4114-0026-7637fa2b0001";
+
+        /**
+         * 微信消息
+         */
+        String SKILL_ID_WECHAT_MSG = "8dab4796-fa37-4114-0002-7637fa2b0002";
 
         /**
          * 对不起，我没有明白你的意思

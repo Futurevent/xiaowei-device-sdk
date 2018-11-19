@@ -41,7 +41,7 @@ class TXCSemaphore
   private:
 
     
-#ifdef OS_MAC
+#if defined(OS_MAC) || defined(TARGET_OS_IPHONE)
     dispatch_semaphore_t semaphore;
 
 #else
