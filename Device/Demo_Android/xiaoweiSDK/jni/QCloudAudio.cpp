@@ -128,6 +128,8 @@ bool on_request_callback(const char *voice_id, TXCA_EVENT event, const char *sta
                 jfieldID id_responseData = objEnv.Env()->GetFieldID(clsAudioResponse,
                                                                     "responseData",
                                                                     "Ljava/lang/String;");
+                jfieldID id_intentInfoForUser = objEnv.Env()->GetFieldID(clsAudioResponse, "intentInfoForUser",
+                                                                   "Ljava/lang/String;");                                                  
                 jfieldID id_autoTestData = objEnv.Env()->GetFieldID(clsAudioResponse,
                                                                     "autoTestData",
                                                                     "Ljava/lang/String;");
@@ -253,6 +255,14 @@ bool on_request_callback(const char *voice_id, TXCA_EVENT event, const char *sta
                 ConvChar2JString(objEnv.Env(), pRsp->response_data, strRspExtend);
                 objEnv.Env()->SetObjectField(objRsp, id_responseData, strRspExtend);
                 objEnv.Env()->DeleteLocalRef(strRspExtend);
+
+                
+                //intent_info_for_user
+                jstring strIntentInfoForUser;
+                ConvChar2JString(objEnv.Env(), pRsp->intent_info, strIntentInfoForUser);
+                objEnv.Env()->SetObjectField(objRsp, id_intentInfoForUser, strIntentInfoForUser);
+                objEnv.Env()->DeleteLocalRef(strIntentInfoForUser);
+                
 
                 //auto_test_data，无需关注，一般都是空值
                 jstring strTestExtend;

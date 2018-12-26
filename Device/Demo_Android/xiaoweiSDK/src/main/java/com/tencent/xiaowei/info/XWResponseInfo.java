@@ -80,6 +80,10 @@ public class XWResponseInfo implements Parcelable {
     public String responseData;
 
     /**
+     * 用户扩展的意图信息，json格式
+     */
+    public String intentInfoForUser;
+    /**
      * 资源集合list
      */
     public XWResGroupInfo[] resources;
@@ -136,6 +140,7 @@ public class XWResponseInfo implements Parcelable {
         context = in.readParcelable(XWContextInfo.class.getClassLoader());
         requestText = in.readString();
         responseData = in.readString();
+        intentInfoForUser = in.readString();
         resources = in.createTypedArray(XWResGroupInfo.CREATOR);
         resourceListType = in.readInt();
         hasMorePlaylist = in.readByte() != 0;
@@ -176,6 +181,7 @@ public class XWResponseInfo implements Parcelable {
                 ", isNotify=" + isNotify +
                 ", wakeupFlag=" + wakeupFlag +
                 ", responseData='" + responseData + '\'' +
+                ", intentInfo='" + intentInfoForUser + '\'' +
                 ", resources=" + Arrays.toString(resources) +
                 '}';
     }
@@ -194,6 +200,7 @@ public class XWResponseInfo implements Parcelable {
         dest.writeParcelable(context, flags);
         dest.writeString(requestText);
         dest.writeString(responseData);
+        dest.writeString(intentInfoForUser);
         dest.writeTypedArray(resources, flags);
         dest.writeInt(resourceListType);
         dest.writeByte((byte) (hasMorePlaylist ? 1 : 0));

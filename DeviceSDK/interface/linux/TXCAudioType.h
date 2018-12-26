@@ -240,6 +240,7 @@ typedef struct _txca_param_response
     const char *request_text;                 // ASR结果文本
     unsigned int response_type;               // 用于信息展示的json数据type
     const char *response_data;               // 用于信息展示的json数据
+    const char *intent_info;               // 额外暴露给用户的intentInfo
 
     unsigned int resource_groups_size;       // 资源集合列表size
     TXCA_PARAM_RES_GROUP *resource_groups;     // 资源集合列表

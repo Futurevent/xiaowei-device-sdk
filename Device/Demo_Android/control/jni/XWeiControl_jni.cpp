@@ -264,6 +264,7 @@ Java_com_tencent_xiaowei_control_XWeiControl_nativeProcessResponse(JNIEnv *env, 
 
     jfieldID jfRequestText = env->GetFieldID(clsResponse, "requestText", "Ljava/lang/String;");
     jfieldID jfResponseData = env->GetFieldID(clsResponse, "responseData", "Ljava/lang/String;");
+    jfieldID jfIntentInfoForUser = env->GetFieldID(clsResponse, "intentInfoForUser", "Ljava/lang/String;");
     jfieldID jfAutoTestData = env->GetFieldID(clsResponse, "autoTestData", "Ljava/lang/String;");
     jfieldID jfResultCode = env->GetFieldID(clsResponse, "resultCode", "I");
     jfieldID jfHasMore = env->GetFieldID(clsResponse, "hasMorePlaylist", "Z");
@@ -274,6 +275,7 @@ Java_com_tencent_xiaowei_control_XWeiControl_nativeProcessResponse(JNIEnv *env, 
 
     jstring strRequestText = (jstring) env->GetObjectField(objResponse, jfRequestText);
     jstring strResponseData = (jstring) env->GetObjectField(objResponse, jfResponseData);
+    jstring strIntentInfoForUser = (jstring) env->GetObjectField(objResponse, jfIntentInfoForUser);
     jstring strAutoTestData = (jstring) env->GetObjectField(objResponse, jfAutoTestData);
 
     if (pVoiceId) {
@@ -286,6 +288,11 @@ Java_com_tencent_xiaowei_control_XWeiControl_nativeProcessResponse(JNIEnv *env, 
     if (strResponseData) {
         pRsp.response_data = env->GetStringUTFChars(strResponseData, NULL);
     }
+    
+    if (strIntentInfoForUser) {
+        pRsp.intent_info = env->GetStringUTFChars(strIntentInfoForUser, NULL);
+    }
+    
 
     pRsp.error_code = (unsigned int) env->GetIntField(objResponse, jfResultCode);
     pRsp.has_more_playlist = (bool) env->GetBooleanField(objResponse, jfHasMore);
@@ -420,6 +427,10 @@ Java_com_tencent_xiaowei_control_XWeiControl_nativeProcessResponse(JNIEnv *env, 
     }
     if (strResponseData) {
         env->ReleaseStringUTFChars(strResponseData, pRsp.response_data);
+    }
+    
+    if (strIntentInfoForUser) {
+        env->ReleaseStringUTFChars(strIntentInfoForUser, pRsp.intent_info);
     }
     if (strSkillId) {
         env->ReleaseStringUTFChars(strSkillId, pRsp.skill_info.id);

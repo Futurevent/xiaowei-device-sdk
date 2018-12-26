@@ -89,6 +89,8 @@ bool send_txca_response(int sessionId, TXCA_PARAM_RESPONSE *pRsp) {
     jfieldID jfAutoTestData = env->GetFieldID(s_class_Response,
                                                "autoTestData",
                                                "Ljava/lang/String;");
+    jfieldID jfRIntentInfoForUser = env->GetFieldID(s_class_Response, "intentInfoForUser",
+                                              "Ljava/lang/String;");
     jfieldID jfResourceGroups = env->GetFieldID(s_class_Response, "resources",
                                             "[Lcom/tencent/xiaowei/info/XWResGroupInfo;");
     jfieldID jfResources = env->GetFieldID(s_class_ResGroup, "resources", "[Lcom/tencent/xiaowei/info/XWResourceInfo;");
@@ -206,6 +208,14 @@ bool send_txca_response(int sessionId, TXCA_PARAM_RESPONSE *pRsp) {
     ConvChar2JString(env, pRsp->response_data, strRspExtend);
     env->SetObjectField(objRsp, jfResponseData, strRspExtend);
     env->DeleteLocalRef(strRspExtend);
+
+    
+    //intent_info 
+    jstring strIntentInfoForUser;
+    ConvChar2JString(env, pRsp->intent_info, strIntentInfoForUser);
+    env->SetObjectField(objRsp, jfRIntentInfoForUser, strIntentInfoForUser);
+    env->DeleteLocalRef(strIntentInfoForUser);
+    
 
     jmethodID initResGroup = env->GetMethodID(s_class_ResGroup, "<init>",
                                               "()V");
